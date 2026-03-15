@@ -130,6 +130,7 @@
           clientPlayers[id].lastDirection = sp.lastDirection;
           clientPlayers[id].message = sp.message;
           clientPlayers[id].name = sp.name;
+          clientPlayers[id].isThinking = sp.isThinking;
         }
       }
     });
@@ -235,10 +236,40 @@
         ctx.fillText(p.name, centerX, nameY);
 
         // 聊天气泡 (跟着浮动)
-        if (p.message) {
+        const bubbleY = sy - 27 + floatY; // 气泡的 Y 坐标
+        if (p.isThinking) {
+          // 如果正在思考，画思考气泡
+          ctx.beginPath();
+          // 用三次贝塞尔曲线 (bezierCurveTo) 画出云朵的弧度
+          ctx.moveTo(centerX - 25, bubbleY);
+          ctx.bezierCurveTo(centerX - 40, bubbleY - 10, centerX - 25, bubbleY - 25, centerX, bubbleY - 25);
+          ctx.bezierCurveTo(centerX + 25, bubbleY - 25, centerX + 40, bubbleY - 10, centerX + 25, bubbleY);
+          ctx.closePath();
+          
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+          ctx.fill();
+          ctx.strokeStyle = '#a4b0be'; // 浅灰色边框，更柔和
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          // 2. 在气泡里画一个大大的 Emoji/符号
+          ctx.font = 'bold 20px "Pixelify Sans", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillStyle = '#576574'; // 深灰色文字
+
+          // 🪄 魔法：让符号随时间循环变化 (💡 -> ❓ -> 💬)
+          const icons = ['💡', '❓', '💬'];
+          const currentIcon = icons[Math.floor(Date.now() / 800) % icons.length];
+          
+          ctx.fillText(currentIcon, centerX, bubbleY - 10);
+        
+        } else if (p.message) {
+          // 如果不在思考且有消息，画聊天气泡
           ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(sx - 30, sy - 65 + floatY, 160, 35, 8); ctx.fill();
           ctx.strokeStyle = '#8ecf7e'; ctx.lineWidth = 2; ctx.stroke();
           ctx.fillStyle = '#5c4a3d'; ctx.textAlign = 'left';
+          ctx.font = '400 14px "Pixelify Sans", sans-serif'; // 聊天字体用细一点
           ctx.fillText(p.message.substring(0, 12) + (p.message.length>12?'...':''), sx - 20, sy - 47 + floatY);
         }
       });

@@ -61,6 +61,9 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
+  // 在工具执行前，立刻告诉服务器：“我开始思考/行动了！”
+  socket.emit('playerStateUpdate', { isThinking: true });
+
   if (name === 'walk') {
     socket.emit('move', { direction: args.direction, steps: args.steps });
     return { content:[{ type: 'text', text: `你试图向 ${args.direction} 走 ${args.steps} 步。请用 look_around 确认是否到达，或是否撞墙。` }] };
@@ -95,6 +98,10 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
       });
     }
+
+    // 工具执行完毕，告诉服务器：“我思考完了！”
+    socket.emit('playerStateUpdate', { isThinking: false });
+
     return { content:[{ type: 'text', text: info }] };
   }
 

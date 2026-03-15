@@ -87,7 +87,7 @@ io.on('connection', (socket) => {
     const zone = getZoneAt(spawnX, spawnY);
     
     gameState.players[socket.id] = {
-      id: socket.id, name: name, x: spawnX, y: spawnY, lastDirection: 'S', message: '',
+      id: socket.id, name: name, x: spawnX, y: spawnY, lastDirection: 'S', message: '', isThinking: false,
       currentZoneName: zone ? zone.name : "小镇街道",
       currentZoneDesc: zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道"
     };
@@ -144,6 +144,17 @@ io.on('connection', (socket) => {
           io.emit('stateUpdate', gameState.players);
         }
       }, 5000);
+    }
+  });
+
+  socket.on('playerStateUpdate', (data) => {
+    const player = gameState.players[socket.id];
+    if (player) {
+      // 把状态更新到玩家对象上
+      player.isThinking = data.isThinking;
+      
+      // 广播给所有观察者
+      io.emit('stateUpdate', gameState.players);
     }
   });
 
