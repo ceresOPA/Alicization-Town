@@ -22,7 +22,7 @@
       border-radius: 12px; 
       box-shadow: 0 10px 20px rgba(92, 74, 61, 0.15); 
       image-rendering: pixelated; 
-      cursor: crosshair; /* 鼠标变瞄准星 */
+      cursor: crosshair; 
     }
   </style>
   <script src="/socket.io/socket.io.js"></script>
@@ -40,37 +40,46 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const TILE_SIZE = 26; 
-    const PLAYER_W = 16, PLAYER_H = 16; 
+    
+    // 动态计算小人尺寸 (假设是 4x4 网格，初始给个默认值)
+    let PLAYER_W = 16, PLAYER_H = 16; 
     
     let mapData = null;
-    let players = {};
+    // 💥 核心变更：前端维护自己独立的玩家状态队列，用于平滑过渡
+    let clientPlayers = {}; 
+    
     const images = {}; 
     let imagesLoaded = 0;
     let totalImagesToLoad = 1; 
     
-    // 鼠标坐标
-    let mouseX = -1;
-    let mouseY = -1;
+    let mouseX = -1, mouseY = -1;
+    let isGameLoopRunning = false;
 
+    // 加载玩家小人图，并自动计算切割尺寸
     images['player'] = new Image();
     images['player'].src = 'assets/player.png';
-    images['player'].onload = () => { imagesLoaded++; tryDraw(); };
+    images['player'].onload = () => { 
+      imagesLoaded++; 
+      // 自动适应 4x4 的图集
+      PLAYER_W = images['player'].width / 4; 
+      PLAYER_H = images['player'].height / 4;
+    };
 
-    // 🖱️ 鼠标事件监听
+    // ==========================================
+    // 🖱️ 鼠标事件
+    // ==========================================
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       mouseX = (e.clientX - rect.left) * scaleX;
       mouseY = (e.clientY - rect.top) * scaleY;
-      tryDraw(); 
     });
+    canvas.addEventListener('mouseleave', () => { mouseX = -1; mouseY = -1; });
 
-    canvas.addEventListener('mouseleave', () => {
-      mouseX = -1; mouseY = -1;
-      tryDraw();
-    });
-
+    // ==========================================
+    // 📡 Socket 监听
+    // ==========================================
     socket.on('connect', () => { socket.emit('join', 'Observer'); });
 
     socket.on('initMap', (data) => { 
@@ -84,18 +93,86 @@
           const imgName = ts.image.split('/').pop();
           images[imgName] = new Image();
           images[imgName].src = 'assets/' + imgName;
-          images[imgName].onload = () => { imagesLoaded++; tryDraw(); };
+          images[imgName].onload = () => { imagesLoaded++; };
         });
       }
-      tryDraw();
+      // 数据准备好后，启动 60fps 主循环
+      if (!isGameLoopRunning) {
+        isGameLoopRunning = true;
+        requestAnimationFrame(gameLoop);
+      }
     });
 
-    socket.on('stateUpdate', (data) => { players = data; tryDraw(); });
+    // 接收服务器最新状态
+    socket.on('stateUpdate', (serverPlayers) => { 
+      // 清理掉线玩家
+      for (const id in clientPlayers) {
+        if (!serverPlayers[id]) delete clientPlayers[id];
+      }
+      
+      // 更新或添加玩家状态
+      for (const id in serverPlayers) {
+        const sp = serverPlayers[id];
+        if (!clientPlayers[id]) {
+          // 新人加入：直接放在出生点
+          clientPlayers[id] = {
+            ...sp,
+            displayX: sp.x * TILE_SIZE, // 屏幕上的渲染真实坐标
+            displayY: sp.y * TILE_SIZE,
+            targetX: sp.x * TILE_SIZE,  // 要走去的目标坐标
+            targetY: sp.y * TILE_SIZE,
+            animFrame: 0 // 走路动画的当前帧
+          };
+        } else {
+          // 老玩家更新：只更新终点，前端负责滑动过去
+          clientPlayers[id].targetX = sp.x * TILE_SIZE;
+          clientPlayers[id].targetY = sp.y * TILE_SIZE;
+          clientPlayers[id].lastDirection = sp.lastDirection;
+          clientPlayers[id].message = sp.message;
+          clientPlayers[id].name = sp.name;
+        }
+      }
+    });
 
-    function tryDraw() {
-      if (mapData && imagesLoaded >= totalImagesToLoad) draw();
+    // ==========================================
+    // 🎮 游戏主循环 (60 FPS 引擎)
+    // ==========================================
+    function gameLoop() {
+      if (mapData && imagesLoaded >= totalImagesToLoad) {
+        updatePhysics(); // 计算滑动和动画
+        draw();          // 绘制到屏幕
+      }
+      requestAnimationFrame(gameLoop); // 递归调用，保持 60 帧
     }
 
+    // 核心物理动画引擎
+    function updatePhysics() {
+      const MOVE_SPEED = 2;   // 每次刷新的滑动像素
+      const ANIM_SPEED = 0.15; // 摆腿动画播放速度
+
+      for (const id in clientPlayers) {
+        const p = clientPlayers[id];
+        let isMoving = false;
+
+        // 平滑 X 轴
+        if (p.displayX < p.targetX) { p.displayX = Math.min(p.displayX + MOVE_SPEED, p.targetX); isMoving = true; }
+        else if (p.displayX > p.targetX) { p.displayX = Math.max(p.displayX - MOVE_SPEED, p.targetX); isMoving = true; }
+
+        // 平滑 Y 轴
+        if (p.displayY < p.targetY) { p.displayY = Math.min(p.displayY + MOVE_SPEED, p.targetY); isMoving = true; }
+        else if (p.displayY > p.targetY) { p.displayY = Math.max(p.displayY - MOVE_SPEED, p.targetY); isMoving = true; }
+
+        // 步态动画循环 (0, 1, 2, 3)
+        if (isMoving) {
+          p.animFrame += ANIM_SPEED;
+          if (p.animFrame >= 4) p.animFrame = 0; 
+        } else {
+          p.animFrame = 0; // 停下来时，恢复立正站好 (第0帧)
+        }
+      }
+    }
+
+    // 画图块辅助函数
     function drawTile(gid, x, y) {
       if (gid === 0) return; 
       const ts = mapData.tilesets.slice().reverse().find(t => gid >= t.firstgid);
@@ -110,6 +187,9 @@
       ctx.drawImage(images[imgName], sx, sy, ts.tilewidth, ts.tileheight, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
     }
 
+    // ==========================================
+    // 🖌️ 渲染画面
+    // ==========================================
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -123,43 +203,43 @@
         }
       });
 
-      // 2. 玩家层
-      let playerList = Object.values(players).sort((a, b) => a.y - b.y);
+      // 2. 玩家层 (用平滑的 Y 轴排序，防止滑动时出现诡异穿插)
+      let playerList = Object.values(clientPlayers).sort((a, b) => a.displayY - b.displayY);
+      
       playerList.forEach(p => {
-        if (p.name === 'Observer') return; // 不画监控台本身
+        if (p.name === 'Observer') return; 
         
-        const sx = p.x * TILE_SIZE, sy = p.y * TILE_SIZE;
+        // 使用平滑坐标，而不是绝对网格坐标！
+        const sx = p.displayX; 
+        const sy = p.displayY;
+
+        // 行走图的方向映射 (假设第一行朝下，第二行朝上，第三行朝左，第四行朝右)
         const DIR = { 'S': 0, 'N': 1, 'W': 2, 'E': 3 };
         const row = DIR[(p.lastDirection || 'S').toUpperCase()] || 0;
+        const col = Math.floor(p.animFrame); // 当前走路的列
         
-        // 🛡️ 防隐身越界检查
-        let drawRow = row;
-        if (drawRow * PLAYER_H >= images['player'].height) drawRow = 0;
-
-        ctx.drawImage(images['player'], 1 * PLAYER_W, drawRow * PLAYER_H, PLAYER_W, PLAYER_H, sx, sy - 10, TILE_SIZE * 1.2, TILE_SIZE * 1.2);
+        // 绘制走路小人
+        ctx.drawImage(images['player'], col * PLAYER_W, row * PLAYER_H, PLAYER_W, PLAYER_H, sx, sy - 10, TILE_SIZE * 1.2, TILE_SIZE * 1.2);
         
+        // 🌟 锐利像素描边名字 + 呼吸浮动动画
         const centerX = sx + TILE_SIZE / 2;
-        
-        // 🪄 魔法动画：利用正弦函数 (Math.sin) 和时间，让名字在头顶缓慢上下呼吸浮动
-        // 加上 p.x 是为了让不同位置的小人浮动频率错开，显得更自然
         const floatY = Math.sin(Date.now() / 300 + p.x) * 2; 
         const nameY = sy - 15 + floatY; 
 
-        ctx.font = '400 12px "Pixelify Sans", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // 1. 画厚重的深色外边框 (增加像素阅读对比度)
-        ctx.lineWidth = 1;
-        ctx.lineJoin = 'round'; // 让边框圆润不扎手
-        ctx.strokeStyle = 'rgba(44, 62, 80, 0.9)'; // 深蓝灰色描边
+        ctx.font = '400 14px "Pixelify Sans", "Comic Sans MS", sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+        ctx.strokeStyle = 'rgba(26, 26, 46, 0.9)'; 
         ctx.strokeText(p.name, centerX, nameY);
+        ctx.fillStyle = p.name === 'Observer' ? '#f1c40f' : '#ffffff';
+        ctx.fillText(p.name, centerX, nameY);
 
+        // 聊天气泡 (跟着浮动)
         if (p.message) {
-          ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(sx - 30, sy - 65, 160, 35, 8); ctx.fill();
+          ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(sx - 30, sy - 65 + floatY, 160, 35, 8); ctx.fill();
           ctx.strokeStyle = '#8ecf7e'; ctx.lineWidth = 2; ctx.stroke();
           ctx.fillStyle = '#5c4a3d'; ctx.textAlign = 'left';
-          ctx.fillText(p.message.substring(0, 12) + (p.message.length>12?'...':''), sx - 20, sy - 47);
+          ctx.fillText(p.message.substring(0, 12) + (p.message.length>12?'...':''), sx - 20, sy - 47 + floatY);
         }
       });
 
@@ -173,7 +253,7 @@
         }
       });
 
-      // 4. 🖱️ 鼠标悬停显示语义区 (Hover Logic)
+      // 4. 🖱️ 鼠标悬停显示语义区 (完整版！)
       const zoneLayer = mapData.layers.find(l => l.name === 'SemanticZones' || l.type === 'objectgroup');
       if (zoneLayer && zoneLayer.objects) {
         zoneLayer.objects.forEach(zone => {
@@ -182,21 +262,42 @@
 
           // 检测鼠标碰撞
           if (mouseX >= rx && mouseX <= rx + rw && mouseY >= ry && mouseY <= ry + rh) {
-            ctx.fillStyle = 'rgba(255, 215, 0, 0.3)'; ctx.fillRect(rx, ry, rw, rh);
-            ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 3; ctx.setLineDash([8, 6]); ctx.strokeRect(rx, ry, rw, rh); ctx.setLineDash([]); 
-
-            // 画白色提示牌
-            // ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; ctx.beginPath();
-            // ctx.roundRect(mouseX + 15, mouseY + 15, 120, 30, 8); ctx.fill();
-            // ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 2; ctx.stroke();
+            // 1. 设置好字体，以便测量
+            ctx.font = 'bold 16px "Pixelify Sans", sans-serif';
+            ctx.textAlign = 'center'; 
+            ctx.textBaseline = 'middle';
             
-            ctx.fillStyle = '#5c4a3d'; ctx.font = 'bold 16px "Pixelify Sans", sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(`📍 ${zone.name}`, mouseX + 75, mouseY + 30);
+            // 2. 测量文字宽度
+            const labelText = `📍 ${zone.name}`;
+            const textMetrics = ctx.measureText(labelText);
+            const textWidth = textMetrics.width;
+            
+            // 3. 计算矩形尺寸 (文字宽度 + 左右各 15px 的内边距)
+            const padding = 20;
+            const rectW = textWidth + padding;
+            const rectH = 35;
+            
+            // 4. 绘制自适应白板
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'; 
+            ctx.beginPath();
+            // 让白板中心稍微偏移鼠标，避免遮挡鼠标指针
+            const rectX = mouseX - 15;
+            const rectY = mouseY - 30;
+            ctx.roundRect(rectX, rectY, rectW, rectH, 8); 
+            ctx.fill();
+            
+            // 5. 绘制橙色边框
+            ctx.strokeStyle = '#f39c12'; 
+            ctx.lineWidth = 2; 
+            ctx.stroke();
+            
+            // 6. 绘制文字 (现在文字被精准地居中在自适应白板里了)
+            ctx.fillStyle = '#5c4a3d';
+            ctx.fillText(labelText, rectX + rectW / 2, rectY + rectH / 2);
           }
         });
       }
-    }
+    } // <- draw() 函数在这里闭合
   </script>
 </body>
 </html>

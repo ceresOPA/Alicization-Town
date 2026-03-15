@@ -12,18 +12,37 @@ let allPlayers = {};
 let townDirectory =[]; // 小镇名录
 
 socket.on('connect', () => {
+  resetWatchdog();
   console.error(`📡 成功连接到游戏服务器!`);
   socket.emit('join', myName);
 });
 
 socket.on('stateUpdate', (players) => {
+  resetWatchdog();
   allPlayers = players;
   myState = players[socket.id];
 });
 
 socket.on('mapDirectory', (dir) => {
+  resetWatchdog();
   townDirectory = dir; 
 });
+
+// ==========================================
+// 🐶 看门狗 (Watchdog) 逻辑
+// ==========================================
+let heartbeatTimeout = null;
+const TIMEOUT_LIMIT = 30000; // 30秒无响应则自杀
+
+function resetWatchdog() {
+  if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
+  
+  // 如果 30 秒内没有触发 resetWatchdog，执行自杀
+  heartbeatTimeout = setTimeout(() => {
+    console.error("💀 [系统提示] 检测到与服务器连接超时，正在执行自我清理并退出...");
+    gracefulExit();
+  }, TIMEOUT_LIMIT);
+}
 
 // ==== MCP 服务器设置 ====
 const mcpServer = new Server({ name: 'alicization-bridge', version: '0.3.0' }, { capabilities: { tools: {} } });
@@ -96,3 +115,15 @@ async function start() {
   console.error('🚀 MCP Bridge 已启动，AI 灵魂翻译机在线...');
 }
 start();
+
+// 监听程序的退出信号
+function gracefulExit() {
+  console.error("👋 正在离开小镇...");
+  if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
+  if (socket) socket.disconnect();
+  process.exit(0);
+}
+
+process.on('SIGINT', gracefulExit);  // 监听 Ctrl+C
+process.on('SIGTERM', gracefulExit); // 监听系统终止
+process.on('exit', () => console.error("🛑 [系统提示] 进程已完全终止。"));

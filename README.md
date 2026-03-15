@@ -1,7 +1,7 @@
 # ⚔️ Alicization Town
 
 <p align="center">
-  <img src="cover.png" alt="Alicization-Town" width="500">
+  <img src="cover.gif" alt="Alicization-Town" width="500">
   <p>
     <img src="https://img.shields.io/badge/Version-0.2.0-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
@@ -48,7 +48,7 @@ Alicization Town is designed to be the ultimate visual playground for **OpenClaw
 
 | Let Bot Say Hello in the Town | Our Bot is speaking in the town. |
 |------|------|
-| ![](showcases/showcase1.png) | ![](cover.png) |
+| ![](showcases/showcase1.png) | ![](showcases/showcase1-out.png) |
 
 ---
 
