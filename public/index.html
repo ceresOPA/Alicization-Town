@@ -25,7 +25,6 @@
       cursor: crosshair; 
     }
   </style>
-  <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <h1>🍃 Alicization Town</h1>
@@ -36,7 +35,6 @@
   </div>
 
   <script>
-    const socket = io();
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const TILE_SIZE = 26; 
@@ -45,7 +43,7 @@
     let PLAYER_W = 16, PLAYER_H = 16; 
     
     let mapData = null;
-    // 💥 核心变更：前端维护自己独立的玩家状态队列，用于平滑过渡
+    // 前端维护自己独立的玩家状态队列，用于平滑过渡
     let clientPlayers = {}; 
     
     const images = {}; 
@@ -80,60 +78,76 @@
     // ==========================================
     // 📡 Socket 监听
     // ==========================================
-    socket.on('connect', () => { socket.emit('join', 'Observer'); });
-
-    socket.on('initMap', (data) => { 
-      mapData = data;
-      canvas.width = mapData.width * TILE_SIZE;
-      canvas.height = mapData.height * TILE_SIZE;
-      
-      if (mapData.tilesets) {
-        totalImagesToLoad += mapData.tilesets.length;
-        mapData.tilesets.forEach(ts => {
-          const imgName = ts.image.split('/').pop();
-          images[imgName] = new Image();
-          images[imgName].src = 'assets/' + imgName;
-          images[imgName].onload = () => { imagesLoaded++; };
-        });
-      }
-      // 数据准备好后，启动 60fps 主循环
-      if (!isGameLoopRunning) {
-        isGameLoopRunning = true;
-        requestAnimationFrame(gameLoop);
-      }
-    });
-
-    // 接收服务器最新状态
-    socket.on('stateUpdate', (serverPlayers) => { 
-      // 清理掉线玩家
-      for (const id in clientPlayers) {
-        if (!serverPlayers[id]) delete clientPlayers[id];
-      }
-      
-      // 更新或添加玩家状态
-      for (const id in serverPlayers) {
-        const sp = serverPlayers[id];
-        if (!clientPlayers[id]) {
-          // 新人加入：直接放在出生点
-          clientPlayers[id] = {
-            ...sp,
-            displayX: sp.x * TILE_SIZE, // 屏幕上的渲染真实坐标
-            displayY: sp.y * TILE_SIZE,
-            targetX: sp.x * TILE_SIZE,  // 要走去的目标坐标
-            targetY: sp.y * TILE_SIZE,
-            animFrame: 0 // 走路动画的当前帧
-          };
-        } else {
-          // 老玩家更新：只更新终点，前端负责滑动过去
-          clientPlayers[id].targetX = sp.x * TILE_SIZE;
-          clientPlayers[id].targetY = sp.y * TILE_SIZE;
-          clientPlayers[id].lastDirection = sp.lastDirection;
-          clientPlayers[id].message = sp.message;
-          clientPlayers[id].name = sp.name;
-          clientPlayers[id].isThinking = sp.isThinking;
+    // ==========================================
+    // 📺 核心变更：使用 EventSource 监听数据流
+    // ==========================================
+    async function initialize() {
+      // 1. 先加载静态的地图文件
+      try {
+        const response = await fetch('assets/map.tmj');
+        mapData = await response.json();
+        
+        // 2. 预加载所有地图和人物图片
+        if (mapData.tilesets) {
+          totalImagesToLoad += mapData.tilesets.length;
+          mapData.tilesets.forEach(ts => {
+            const imgName = ts.image.split('/').pop();
+            images[imgName] = new Image();
+            images[imgName].src = 'assets/' + imgName;
+            images[imgName].onload = () => { imagesLoaded++; };
+          });
         }
+        canvas.width = mapData.width * TILE_SIZE;
+        canvas.height = mapData.height * TILE_SIZE;
+
+        // 3. 连接到 SSE 数据流
+        const eventSource = new EventSource('/events');
+        
+        eventSource.onopen = () => {
+          document.querySelector('p').innerText = "✅ Let your OpenClaw or ClaudeCode Join the World!";
+        };
+        
+        // 4. 收到新状态时，更新 players 数据
+        eventSource.onmessage = (event) => {
+          const serverPlayers = JSON.parse(event.data);
+
+          // 💥 这里必须做“平滑处理”，否则小人会瞬移，而不是走动
+          for (const id in serverPlayers) {
+              const sp = serverPlayers[id];
+              if (!clientPlayers[id]) {
+                  // 新玩家，初始化
+                  clientPlayers[id] = { ...sp, displayX: sp.x * TILE_SIZE, displayY: sp.y * TILE_SIZE, targetX: sp.x * TILE_SIZE, targetY: sp.y * TILE_SIZE, animFrame: 0 };
+              } else {
+                  // 💥 这里：更新目标坐标，交给 gameLoop 去平滑滑动
+                  clientPlayers[id].targetX = sp.x * TILE_SIZE;
+                  clientPlayers[id].targetY = sp.y * TILE_SIZE;
+                  clientPlayers[id].lastDirection = sp.lastDirection;
+                  clientPlayers[id].message = sp.message;
+                  clientPlayers[id].name = sp.name;
+                  clientPlayers[id].isThinking = sp.isThinking; // 别忘了加上思考状态
+              }
+          }
+          // 自动清理断开连接的玩家
+          for (const id in clientPlayers) {
+              if (!serverPlayers[id]) delete clientPlayers[id];
+          }
+
+        };
+        
+        eventSource.onerror = () => {
+          document.querySelector('p').innerText = "❌ 与服务器断开，正在尝试重连...";
+        };
+
+        // 5. 启动 60fps 游戏主循环
+        if (!isGameLoopRunning) {
+          isGameLoopRunning = true;
+          requestAnimationFrame(gameLoop);
+        }
+      } catch (error) {
+        document.querySelector('p').innerText = "😱 加载地图失败！请检查 public/assets/map.tmj 是否存在。";
+        console.error("加载地图失败:", error);
       }
-    });
+    }
 
     // ==========================================
     // 🎮 游戏主循环 (60 FPS 引擎)
@@ -206,18 +220,15 @@
 
       // 2. 玩家层 (用平滑的 Y 轴排序，防止滑动时出现诡异穿插)
       let playerList = Object.values(clientPlayers).sort((a, b) => a.displayY - b.displayY);
-      
       playerList.forEach(p => {
-        if (p.name === 'Observer') return; 
-        
         // 使用平滑坐标，而不是绝对网格坐标！
         const sx = p.displayX; 
         const sy = p.displayY;
 
         // 行走图的方向映射 (假设第一行朝下，第二行朝上，第三行朝左，第四行朝右)
         const DIR = { 'S': 0, 'N': 1, 'W': 2, 'E': 3 };
-        const row = DIR[(p.lastDirection || 'S').toUpperCase()] || 0;
-        const col = Math.floor(p.animFrame); // 当前走路的列
+        const col = DIR[(p.lastDirection || 'S').toUpperCase()] || 0;
+        const row = Math.floor(p.animFrame); // 当前走路的列
         
         // 绘制走路小人
         ctx.drawImage(images['player'], col * PLAYER_W, row * PLAYER_H, PLAYER_W, PLAYER_H, sx, sy - 10, TILE_SIZE * 1.2, TILE_SIZE * 1.2);
@@ -329,6 +340,7 @@
         });
       }
     } // <- draw() 函数在这里闭合
+    initialize();
   </script>
 </body>
 </html>

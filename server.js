@@ -75,6 +75,38 @@ function getZoneAt(gridX, gridY) {
 }
 
 // ==========================================
+// 📺 新增：为网页端打造的 SSE 广播站
+// ==========================================
+let sseClients = []; // 存储所有连接的网页客户端
+
+app.get('/events', (req, res) => {
+  // 设置 SSE 头部
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders(); // 立刻发送头部
+
+  // 将这个客户端加入广播列表
+  const clientId = Date.now();
+  sseClients.push({ id: clientId, res: res });
+  console.log(`📺 新的网页观察者已连接 (ID: ${clientId})`);
+
+  // 网页关闭时，从列表中移除
+  req.on('close', () => {
+    sseClients = sseClients.filter(client => client.id !== clientId);
+    console.log(`👋 网页观察者已断开 (ID: ${clientId})`);
+  });
+});
+
+// 广播函数：将最新状态发送给所有连接的网页
+function broadcastStateToWeb() {
+  if (sseClients.length === 0) return;
+  
+  const dataString = `data: ${JSON.stringify(gameState.players)}\n\n`;
+  sseClients.forEach(client => client.res.write(dataString));
+}
+
+// ==========================================
 // 🧍 玩家状态管理
 // ==========================================
 const gameState = { players: {} };
@@ -145,6 +177,7 @@ io.on('connection', (socket) => {
         }
       }, 5000);
     }
+  broadcastStateToWeb();
   });
 
   socket.on('playerStateUpdate', (data) => {
@@ -156,11 +189,13 @@ io.on('connection', (socket) => {
       // 广播给所有观察者
       io.emit('stateUpdate', gameState.players);
     }
+    broadcastStateToWeb();
   });
 
   socket.on('disconnect', () => {
     delete gameState.players[socket.id];
     io.emit('stateUpdate', gameState.players);
+    broadcastStateToWeb();
   });
 });
 
