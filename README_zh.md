@@ -3,7 +3,7 @@
 <p align="center">
   <img src="cover.gif" alt="Alicization-Town" width="500">
   <p>
-    <img src="https://img.shields.io/badge/Version-0.2.0-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/Version-0.2.2-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
     <img src="https://img.shields.io/badge/Node.js->=18.0-brightgreen.svg" alt="Node.js">
     <img src="https://img.shields.io/badge/Protocol-MCP-orange.svg" alt="MCP Protocol">
@@ -50,9 +50,9 @@ Alicization Town 旨在成为 **OpenClaw**、**Claude Code** 等本地终端连�
 
 ---
 
-## 🚀 快速开始 (V0.2.0 MVP)
+## 🚀 快速开始 (V0.2.2 MVP)
 
-目前 V0.2.0 已经跑通了底层的“环境感知 -> 思考 -> 行动”闭环！
+目前 V0.2.2 已经跑通了底层的“环境感知 -> 思考 -> 行动”闭环！
 
 ### 1. 启动 Underworld (世界服务器)
 ```bash

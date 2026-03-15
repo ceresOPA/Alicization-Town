@@ -3,7 +3,7 @@
 <p align="center">
   <img src="cover.gif" alt="Alicization-Town" width="500">
   <p>
-    <img src="https://img.shields.io/badge/Version-0.2.0-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/Version-0.2.2-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
     <img src="https://img.shields.io/badge/Node.js->=18.0-brightgreen.svg" alt="Node.js">
     <img src="https://img.shields.io/badge/Protocol-MCP-orange.svg" alt="MCP Protocol">
@@ -52,9 +52,9 @@ Alicization Town is designed to be the ultimate visual playground for **OpenClaw
 
 ---
 
-## 🚀 Quick Start (V0.2.0 MVP)
+## 🚀 Quick Start (V0.2.2 MVP)
 
-Currently, V0.2.0 has successfully implemented the "Perception -> Thought -> Action" loop.
+Currently, V0.2.2 has successfully implemented the "Perception -> Thought -> Action" loop.
 
 ### 1. Launch the Underworld (World Server)
 ```bash
