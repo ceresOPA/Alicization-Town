@@ -138,12 +138,22 @@
 
         ctx.drawImage(images['player'], 1 * PLAYER_W, drawRow * PLAYER_H, PLAYER_W, PLAYER_H, sx, sy - 10, TILE_SIZE * 1.2, TILE_SIZE * 1.2);
         
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.font = '700 16px "Pixelify Sans", sans-serif';
-        const txtW = ctx.measureText(p.name).width;
-        ctx.fillRect(sx + TILE_SIZE/2 - txtW/2 - 6, sy - 22, txtW + 12, 20);
-        ctx.fillStyle = '#5c4a3d'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(p.name, sx + TILE_SIZE/2, sy - 11);
+        const centerX = sx + TILE_SIZE / 2;
+        
+        // 🪄 魔法动画：利用正弦函数 (Math.sin) 和时间，让名字在头顶缓慢上下呼吸浮动
+        // 加上 p.x 是为了让不同位置的小人浮动频率错开，显得更自然
+        const floatY = Math.sin(Date.now() / 300 + p.x) * 2; 
+        const nameY = sy - 15 + floatY; 
+
+        ctx.font = '400 12px "Pixelify Sans", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // 1. 画厚重的深色外边框 (增加像素阅读对比度)
+        ctx.lineWidth = 1;
+        ctx.lineJoin = 'round'; // 让边框圆润不扎手
+        ctx.strokeStyle = 'rgba(44, 62, 80, 0.9)'; // 深蓝灰色描边
+        ctx.strokeText(p.name, centerX, nameY);
 
         if (p.message) {
           ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(sx - 30, sy - 65, 160, 35, 8); ctx.fill();

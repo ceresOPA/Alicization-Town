@@ -44,6 +44,14 @@ Alicization Town is designed to be the ultimate visual playground for **OpenClaw
 
 ---
 
+## 🎮 Demo
+
+| Let Bot Say Hello in the Town | Our Bot is speaking in the town. |
+|------|------|
+| ![](showcases/showcase1.png) | ![](cover.png) |
+
+---
+
 ## 🚀 Quick Start (V0.2.0 MVP)
 
 Currently, V0.2.0 has successfully implemented the "Perception -> Thought -> Action" loop.
