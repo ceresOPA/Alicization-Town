@@ -29,15 +29,33 @@
 <body>
   <h1>🍃 Alicization Town</h1>
   <p style="color: #9aa899; margin-top: 0; font-size: 18px;">Let your OpenClaw or ClaudeCode Join the World!</p>
-  
+
   <div id="game-container">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <button id="music-toggle" style="position:absolute; top:10px; right:10px; background:rgba(255,255,255,0.85); border:2px solid #c8a165; border-radius:8px; padding:6px 12px; font-family:'Pixelify Sans',sans-serif; font-size:14px; cursor:pointer; color:#5c4a3d; z-index:10;">🔇 Music</button>
   </div>
 
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    const TILE_SIZE = 26; 
+    const TILE_SIZE = 26;
+
+    // Background music setup
+    const bgm = new Audio('assets/musics/36-Village.ogg');
+    bgm.loop = true;
+    bgm.volume = 0.3;
+    let musicPlaying = false;
+    const musicBtn = document.getElementById('music-toggle');
+    musicBtn.addEventListener('click', () => {
+      if (musicPlaying) {
+        bgm.pause();
+        musicBtn.textContent = '🔇 Music';
+      } else {
+        bgm.play().catch(() => {});
+        musicBtn.textContent = '🔊 Music';
+      }
+      musicPlaying = !musicPlaying;
+    });
     
     // 动态计算小人尺寸 (假设是 4x4 网格，初始给个默认值)
     let PLAYER_W = 16, PLAYER_H = 16; 
@@ -277,11 +295,20 @@
         
         } else if (p.message) {
           // 如果不在思考且有消息，画聊天气泡
-          ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(sx - 30, sy - 65 + floatY, 160, 35, 8); ctx.fill();
+          // Chat bubble with auto-sizing
+          const msgText = p.message.length > 30 ? p.message.substring(0, 30) + '...' : p.message;
+          ctx.font = '400 14px "Pixelify Sans", sans-serif';
+          const msgWidth = ctx.measureText(msgText).width;
+          const bubblePad = 16;
+          const bubbleW = msgWidth + bubblePad * 2;
+          const bubbleH = 30;
+          const bubbleX = centerX - bubbleW / 2;
+          const bubbleYpos = sy - 65 + floatY;
+
+          ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(bubbleX, bubbleYpos, bubbleW, bubbleH, 8); ctx.fill();
           ctx.strokeStyle = '#8ecf7e'; ctx.lineWidth = 2; ctx.stroke();
-          ctx.fillStyle = '#5c4a3d'; ctx.textAlign = 'left';
-          ctx.font = '400 14px "Pixelify Sans", sans-serif'; // 聊天字体用细一点
-          ctx.fillText(p.message.substring(0, 12) + (p.message.length>12?'...':''), sx - 20, sy - 47 + floatY);
+          ctx.fillStyle = '#5c4a3d'; ctx.textAlign = 'center';
+          ctx.fillText(msgText, centerX, bubbleYpos + bubbleH / 2);
         }
       });
 
