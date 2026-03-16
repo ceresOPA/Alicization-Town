@@ -42,7 +42,7 @@
       padding: 4px 10px; font-size: 14px; font-family: 'Pixelify Sans', sans-serif;
     }
 
-    /* Side panel: chat log + mini-map */
+    /* Side panel: chat log + mini-map + AI panel */
     #side-panel {
       width: 280px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
     }
@@ -52,6 +52,59 @@
     }
     #minimap-container h3 { color: #ffeaa7; font-size: 14px; margin-bottom: 4px; }
     #minimapCanvas { border-radius: 6px; image-rendering: pixelated; width: 100%; }
+
+    /* AI Online Panel */
+    #ai-panel-container {
+      background: rgba(40,40,60,0.9); border: 3px solid #c8a165;
+      border-radius: 10px; padding: 8px; max-height: 240px;
+      display: flex; flex-direction: column;
+    }
+    #ai-panel-container h3 { color: #ffeaa7; font-size: 14px; margin-bottom: 4px; flex-shrink: 0; }
+    #ai-panel-header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+    #ai-count { color: #74b9ff; font-size: 12px; }
+    #ai-list {
+      flex: 1; overflow-y: auto; font-size: 12px; color: #ddd;
+      scrollbar-width: thin; scrollbar-color: #c8a165 transparent;
+    }
+    #ai-list::-webkit-scrollbar { width: 5px; }
+    #ai-list::-webkit-scrollbar-thumb { background: #c8a165; border-radius: 3px; }
+    .ai-card {
+      display: flex; align-items: center; gap: 8px; padding: 5px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+      border-radius: 6px; transition: background 0.2s;
+    }
+    .ai-card:hover { background: rgba(255,255,255,0.08); }
+    .ai-card.selected { background: rgba(116,185,255,0.15); border: 1px solid rgba(116,185,255,0.3); }
+    .ai-avatar { width: 28px; height: 28px; image-rendering: pixelated; border-radius: 4px; background: rgba(0,0,0,0.3); }
+    .ai-info { flex: 1; min-width: 0; }
+    .ai-name { color: #74b9ff; font-weight: 700; font-size: 13px; }
+    .ai-zone { color: #9aa899; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ai-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .ai-status-dot.thinking { background: #fdcb6e; animation: pulse 1s infinite; }
+    .ai-status-dot.idle { background: #00b894; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* Activity detail panel */
+    #activity-detail {
+      display: none; background: rgba(40,40,60,0.95); border: 3px solid #74b9ff;
+      border-radius: 10px; padding: 8px; max-height: 200px;
+      flex-direction: column;
+    }
+    #activity-detail.visible { display: flex; }
+    #activity-detail h3 { color: #74b9ff; font-size: 14px; margin-bottom: 4px; flex-shrink: 0; }
+    #activity-detail-name { color: #ffeaa7; font-weight: 700; }
+    #activity-log {
+      flex: 1; overflow-y: auto; font-size: 11px; color: #bbb; line-height: 1.5;
+      scrollbar-width: thin; scrollbar-color: #74b9ff transparent;
+    }
+    #activity-log::-webkit-scrollbar { width: 4px; }
+    #activity-log::-webkit-scrollbar-thumb { background: #74b9ff; border-radius: 3px; }
+    .activity-item { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .activity-time { color: #636e72; font-size: 10px; }
+    .activity-type-move { color: #81ecec; }
+    .activity-type-say { color: #74b9ff; }
+    .activity-type-interact { color: #fdcb6e; }
+    .activity-type-join { color: #00b894; }
 
     #chatlog-container {
       background: rgba(40,40,60,0.9); border: 3px solid #c8a165;
@@ -86,7 +139,18 @@
     <div id="side-panel">
       <div id="minimap-container">
         <h3>Mini Map</h3>
-        <canvas id="minimapCanvas" width="240" height="160"></canvas>
+        <canvas id="minimapCanvas" width="300" height="210"></canvas>
+      </div>
+      <div id="ai-panel-container">
+        <div id="ai-panel-header">
+          <h3>AI Online</h3>
+          <span id="ai-count">0 online</span>
+        </div>
+        <div id="ai-list"></div>
+      </div>
+      <div id="activity-detail">
+        <h3>Activity: <span id="activity-detail-name"></span></h3>
+        <div id="activity-log"></div>
       </div>
       <div id="chatlog-container">
         <h3>Chat Log</h3>
@@ -123,6 +187,15 @@
     // === PLACEHOLDER: Chat log data ===
     let chatMessages = [];
     const MAX_DISPLAY_MESSAGES = 100;
+
+    // === AI Panel state ===
+    let selectedPlayerId = null;
+    let playerActivityData = {}; // keyed by socket id
+    const aiListEl = document.getElementById('ai-list');
+    const aiCountEl = document.getElementById('ai-count');
+    const activityDetailEl = document.getElementById('activity-detail');
+    const activityDetailNameEl = document.getElementById('activity-detail-name');
+    const activityLogEl = document.getElementById('activity-log');
 
     // === Background music ===
     const bgm = new Audio('assets/musics/36-Village.ogg');
@@ -249,7 +322,7 @@
           for (const id in serverPlayers) {
             const sp = serverPlayers[id];
             if (!clientPlayers[id]) {
-              clientPlayers[id] = { ...sp, displayX: sp.x * TILE_SIZE, displayY: sp.y * TILE_SIZE, targetX: sp.x * TILE_SIZE, targetY: sp.y * TILE_SIZE, animFrame: 0 };
+              clientPlayers[id] = { ...sp, displayX: sp.x * TILE_SIZE, displayY: sp.y * TILE_SIZE, targetX: sp.x * TILE_SIZE, targetY: sp.y * TILE_SIZE, animFrame: 0, id: id };
             } else {
               clientPlayers[id].targetX = sp.x * TILE_SIZE;
               clientPlayers[id].targetY = sp.y * TILE_SIZE;
@@ -259,7 +332,9 @@
               clientPlayers[id].interactionIcon = sp.interactionIcon;
               clientPlayers[id].sprite = sp.sprite;
               clientPlayers[id].name = sp.name;
+              clientPlayers[id].id = id;
               clientPlayers[id].isThinking = sp.isThinking;
+              clientPlayers[id].currentZoneName = sp.currentZoneName;
 
               // Play sound when interaction starts
               if (sp.interactionSound && !clientPlayers[id]._lastSound) {
@@ -270,8 +345,9 @@
             }
           }
           for (const id in clientPlayers) {
-            if (!serverPlayers[id]) delete clientPlayers[id];
+            if (!serverPlayers[id]) { delete clientPlayers[id]; delete playerActivityData[id]; }
           }
+          updateAiPanel();
         };
         // Chat history (initial batch)
         eventSource.addEventListener('chatHistory', (event) => {
@@ -288,6 +364,14 @@
         eventSource.addEventListener('interaction', (event) => {
           const entry = JSON.parse(event.data);
           addInteractionMessage(entry);
+        });
+        // Activity events (for AI panel)
+        eventSource.addEventListener('activity', (event) => {
+          const data = JSON.parse(event.data);
+          playerActivityData[data.id] = data.activities || [];
+          if (selectedPlayerId === data.id) {
+            renderActivityLog(data.id);
+          }
         });
         eventSource.onerror = () => {
           document.getElementById('status-text').innerText = "Disconnected - Reconnecting...";
@@ -710,8 +794,27 @@
         const ph = spriteImg.height / 4;
         ctx.drawImage(spriteImg, col * pw, row * ph, pw, ph, sx, sy - 10, TILE_SIZE * 1.2, TILE_SIZE * 1.2);
 
-        // Name with breathing animation
         const centerX = sx + TILE_SIZE / 2;
+
+        // Selected player highlight (from AI panel)
+        if (selectedPlayerId && p.id === selectedPlayerId) {
+          const flashAlpha = Math.max(0, 0.4 - (Date.now() - selectedFlashTime) / 2000 * 0.3);
+          ctx.strokeStyle = `rgba(116, 185, 255, ${0.5 + 0.3 * Math.sin(Date.now() / 300)})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.roundRect(sx - 3, sy - 13, TILE_SIZE * 1.2 + 6, TILE_SIZE * 1.2 + 6, 6);
+          ctx.stroke();
+          // Arrow indicator above
+          const arrowY = sy - 22 + Math.sin(Date.now() / 400) * 3;
+          ctx.fillStyle = '#74b9ff';
+          ctx.beginPath();
+          ctx.moveTo(centerX - 4, arrowY);
+          ctx.lineTo(centerX + 4, arrowY);
+          ctx.lineTo(centerX, arrowY + 5);
+          ctx.closePath(); ctx.fill();
+        }
+
+        // Name with breathing animation
         const floatY = Math.sin(Date.now() / 300 + p.x) * 2;
         const nameY = sy - 15 + floatY;
         ctx.font = '400 14px "Pixelify Sans", "Comic Sans MS", sans-serif';
@@ -994,6 +1097,83 @@
       const div = document.createElement('div');
       div.textContent = text || '';
       return div.innerHTML;
+    }
+
+    // === AI Panel functions ===
+    function updateAiPanel() {
+      const players = Object.values(clientPlayers).filter(p => p.name !== 'Observer');
+      aiCountEl.textContent = `${players.length} online`;
+
+      aiListEl.innerHTML = '';
+      players.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'ai-card' + (selectedPlayerId === p.id ? ' selected' : '');
+
+        // Create avatar canvas
+        const avatarCanvas = document.createElement('canvas');
+        avatarCanvas.width = 16; avatarCanvas.height = 16;
+        avatarCanvas.className = 'ai-avatar';
+        const spriteImg = (p.sprite && characterImages[p.sprite]) ? characterImages[p.sprite] : images['player'];
+        if (spriteImg && spriteImg.complete) {
+          const actx = avatarCanvas.getContext('2d');
+          actx.imageSmoothingEnabled = false;
+          const pw = spriteImg.width / 4, ph = spriteImg.height / 4;
+          actx.drawImage(spriteImg, 0, 0, pw, ph, 0, 0, 16, 16);
+        }
+
+        const zoneName = (p.currentZoneName || p.lastZone || '小镇街道');
+        const statusClass = p.isThinking ? 'thinking' : 'idle';
+        card.innerHTML = `
+          <div class="ai-info">
+            <div class="ai-name">${escapeHtml(p.name)}</div>
+            <div class="ai-zone">${escapeHtml(zoneName)}</div>
+          </div>
+          <div class="ai-status-dot ${statusClass}" title="${p.isThinking ? 'Thinking...' : 'Idle'}"></div>
+        `;
+        card.prepend(avatarCanvas);
+
+        card.addEventListener('click', () => {
+          if (selectedPlayerId === p.id) {
+            selectedPlayerId = null;
+            activityDetailEl.classList.remove('visible');
+          } else {
+            selectedPlayerId = p.id;
+            activityDetailEl.classList.add('visible');
+            activityDetailNameEl.textContent = p.name;
+            renderActivityLog(p.id);
+            // Center camera on this player
+            if (p.displayX !== undefined) {
+              const camX = p.displayX - canvas.width / 2;
+              const camY = p.displayY - canvas.height / 2;
+              // Highlight with a flash
+              selectedFlashTime = Date.now();
+            }
+          }
+          updateAiPanel(); // re-render to update selection style
+        });
+
+        aiListEl.appendChild(card);
+      });
+
+      // If selected player disconnected, clear selection
+      if (selectedPlayerId && !clientPlayers[selectedPlayerId]) {
+        selectedPlayerId = null;
+        activityDetailEl.classList.remove('visible');
+      }
+    }
+
+    let selectedFlashTime = 0;
+
+    function renderActivityLog(playerId) {
+      const activities = playerActivityData[playerId] || [];
+      activityLogEl.innerHTML = '';
+      activities.slice().reverse().forEach(a => {
+        const div = document.createElement('div');
+        div.className = 'activity-item';
+        const timeStr = new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        div.innerHTML = `<span class="activity-time">${timeStr}</span> <span class="activity-type-${a.type || 'move'}">${escapeHtml(a.text || '')}</span>`;
+        activityLogEl.appendChild(div);
+      });
     }
 
     // Boot

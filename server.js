@@ -153,6 +153,57 @@ const ZONE_INTERACTIONS = {
       { action: '查看库存', result: '仓库里堆满了各种物资：粮食、药草、矿石、木材。管理员正在清点货物。(The warehouse is stocked with supplies: grain, herbs, ore, timber. The manager is taking inventory.)', icon: 'GoldCoin', sound: 'interact' },
       { action: '发现一个旧箱子', result: '角落里有个落灰的旧箱子，打开一看，里面有几枚古老的金币和一张泛黄的地图。(A dusty old crate in the corner. Inside: ancient gold coins and a yellowed map.)', icon: 'GoldKey', sound: 'interact' },
     ],
+    'library': [
+      { action: '翻阅古籍', result: '你找到了一本关于小镇历史的古老典籍，里面记载着传说中地下迷宫的入口就在神社附近。(You find an ancient tome about town history. It mentions a legendary underground labyrinth entrance near the shrine.)', icon: 'GoldKey', sound: 'interact' },
+      { action: '研究地图', result: '书架上有一幅详细的地区地图，标注了周围山脉中的矿脉位置和远古遗迹。(A detailed regional map on the shelf marks ore veins in surrounding mountains and ancient ruins.)', icon: 'GoldCoin', sound: 'interact' },
+      { action: '和图书管理员聊天', result: '管理员是个博学的老者，他说："最近有人在花园里发现了发光的石头，可能是魔法水晶。"(The learned librarian says: "Someone recently found glowing stones in the garden — possibly magic crystals.")', icon: 'FortuneCookie', sound: 'chat' },
+      { action: '安静地阅读', result: '你在窗边找了个位子，沉浸在一本冒险小说中。午后的阳光照在书页上，十分惬意。(You find a window seat and lose yourself in an adventure novel. Afternoon sun warms the pages.)', icon: 'Heart', sound: 'heal' },
+    ],
+    'shrine': [
+      { action: '在许愿池投硬币', result: '金币在空中旋转，落入清澈的池水中。你许了一个愿望，感到心中充满希望。(The coin spins through the air into clear water. You make a wish and feel filled with hope.)', icon: 'GoldCoin', sound: 'magic' },
+      { action: '参拜神社', result: '你双手合十虔诚地参拜。一阵温暖的微风吹过，似乎有一股神秘的力量在回应你。(You clasp your hands and pray. A warm breeze passes — some mysterious power seems to respond.)', icon: 'Heart', sound: 'magic' },
+      { action: '点燃石灯笼', result: '你点燃了一盏石灯笼，柔和的光芒照亮了神社的院落。空气中弥漫着淡淡的檀香。(You light a stone lantern. Soft light illuminates the shrine courtyard. A faint sandalwood fragrance fills the air.)', icon: 'LifePot', sound: 'magic' },
+      { action: '解读石碑上的铭文', result: '石碑上刻着古老的文字："当七星连珠之时，沉睡之门将再次开启。"(Ancient text on the stone tablet: "When seven stars align, the sleeping gate shall open once more.")', icon: 'GoldKey', sound: 'interact' },
+    ],
+    'farm': [
+      { action: '帮助农夫收割麦子', result: '你和农夫一起在金黄的麦田里劳作。虽然辛苦，但丰收的喜悦让人心满意足。(You help harvest wheat. Hard work, but the joy of a bountiful harvest is deeply satisfying.)', icon: 'Honey', sound: 'interact' },
+      { action: '在菜园里采摘蔬菜', result: '新鲜的番茄、黄瓜和萝卜，都是今天早上刚成熟的。农夫让你带走一些。(Fresh tomatoes, cucumbers, radishes — all ripened this morning. The farmer lets you take some.)', icon: 'Onigiri', sound: 'interact' },
+      { action: '喂农场动物', result: '鸡鸣、牛叫、羊咩咩，农场里的动物们吃到食物后显得很开心。(Chickens cluck, cows moo, sheep baa — the farm animals are happy with their feed.)', icon: 'Heart', sound: 'heal' },
+      { action: '品尝刚出炉的面包', result: '农夫的妻子用自家种的小麦烤了面包，外酥内软，带着淡淡的甜味。(The farmer\'s wife baked bread from their wheat. Crispy outside, soft inside, with a gentle sweetness.)', icon: 'Meat', sound: 'interact' },
+    ],
+    'blacksmith': [
+      { action: '观摩锻造过程', result: '铁匠把通红的铁块放在铁砧上，火花四溅。精湛的手艺让你叹为观止。(The blacksmith places glowing metal on the anvil. Sparks fly — his mastery is breathtaking.)', icon: 'Sword', sound: 'interact' },
+      { action: '请铁匠修复装备', result: '铁匠仔细检查了你的装备，敲敲打打之后焕然一新。"像新的一样！"他自豪地说。(The blacksmith inspects your gear. After hammering, it looks brand new. "Good as new!" he says proudly.)', icon: 'Katana', sound: 'interact' },
+      { action: '试穿一套铠甲', result: '钢铁铠甲闪闪发光，穿上后感觉自己像个真正的骑士。虽然有点重。(The steel armor gleams. You feel like a true knight wearing it — though it\'s a bit heavy.)', icon: 'Sword', sound: 'interact' },
+      { action: '学习基础锻造', result: '铁匠教你如何控制炉温和锤击的力度。你成功打出了一枚粗糙的铁钉！(The blacksmith teaches temperature control and hammer technique. You forge a rough iron nail!)', icon: 'Katana', sound: 'interact' },
+    ],
+    'dock': [
+      { action: '坐在码头钓鱼', result: '你放下鱼线静静等待。微风吹过水面，远处传来海鸥的叫声。终于，一条肥鱼上钩了！(You cast your line and wait. A breeze ripples the water, seagulls cry in the distance. Finally — a big bite!)', icon: 'Fish', sound: 'interact' },
+      { action: '检查停泊的小船', result: '一艘小船的船舱里藏着一张航海图，上面标记着"龙之岛"的位置。(A boat\'s cabin hides a nautical chart marking the location of "Dragon Island".)', icon: 'GoldKey', sound: 'interact' },
+      { action: '和渔夫聊天', result: '老渔夫说："最近海里出现了发光的鱼，老一辈说那是海神的使者。"(The old fisherman says: "Glowing fish appeared lately. Elders say they\'re messengers of the sea god.")', icon: 'FortuneCookie', sound: 'chat' },
+      { action: '望向远方的海面', result: '夕阳映照在海面上，金光粼粼。远处隐约可见一座小岛的轮廓。(Sunset reflects golden on the water. A faint island silhouette appears in the distance.)', icon: 'WaterPot', sound: 'heal' },
+    ],
+    'garden': [
+      { action: '在花丛中漫步', result: '玫瑰、薰衣草、向日葵...每一朵花都散发着独特的香气。蝴蝶停在你的肩头。(Roses, lavender, sunflowers... each with its own fragrance. A butterfly lands on your shoulder.)', icon: 'Heart', sound: 'heal' },
+      { action: '采集稀有花草', result: '你发现了一株发着淡淡蓝光的花朵，这是传说中的"月光花"，据说有神奇的药用价值。(You find a faintly glowing blue flower — the legendary "Moonflower" said to have miraculous medicinal properties.)', icon: 'LifePot', sound: 'magic' },
+      { action: '和园丁交谈', result: '园丁说："这些花需要用温泉水浇灌才能开得这么好，你去看看那边的温泉吧。"(The gardener says: "These flowers bloom so well because of hot spring water. You should visit the springs.")', icon: 'FortuneCookie', sound: 'chat' },
+    ],
+    'watchtower': [
+      { action: '登上塔顶瞭望', result: '从塔顶可以看到整个小镇的全貌：北边的仓库、南边的农场、东边的花园...一切尽收眼底。(From the tower top you see the whole town: warehouse to the north, farm to the south, garden to the east...)', icon: 'Bow', sound: 'interact' },
+      { action: '和守卫交谈', result: '守卫说："最近东方森林里有异常的动静，可能有魔物出没。大家要小心。"(The guard says: "Strange movements in the eastern forest lately. Possibly monsters. Everyone be careful.")', icon: 'Sword', sound: 'chat' },
+      { action: '使用望远镜', result: '透过古老的望远镜，你看到远方山脉中有一座隐藏的城堡，在云雾中若隐若现。(Through the ancient telescope, you spot a hidden castle in the distant mountains, shrouded in mist.)', icon: 'GoldKey', sound: 'interact' },
+    ],
+    'hotspring': [
+      { action: '泡温泉放松', result: '温暖的泉水包裹着全身，疲劳感一扫而空。据说这温泉还有治愈伤口的效果。(Warm spring water envelops you. Fatigue melts away. Legend says the springs can heal wounds.)', icon: 'Heart', sound: 'heal' },
+      { action: '收集温泉水', result: '你用瓶子装了一些温泉水。这种含有矿物质的水可以用来制作药水。(You collect spring water in a bottle. This mineral-rich water can be used to brew potions.)', icon: 'WaterPot', sound: 'interact' },
+      { action: '享受温泉蒸汽', result: '氤氲的蒸汽让人仿佛置身仙境。远处传来风铃的声音，无比宁静。(Rising steam creates an ethereal atmosphere. Wind chimes sound in the distance — perfect serenity.)', icon: 'MilkPot', sound: 'heal' },
+    ],
+    'marketplace': [
+      { action: '逛小摊', result: '摊位上摆满了各种稀奇古怪的商品：魔法卷轴、水晶球、远方的香料、手工饰品。(Stalls overflow with curious goods: magic scrolls, crystal balls, exotic spices, handmade jewelry.)', icon: 'GoldCoin', sound: 'interact' },
+      { action: '和商人讨价还价', result: '你看中了一颗水晶球，经过一番激烈的讨价还价，终于以合理的价格买下。(You eye a crystal ball. After fierce bargaining, you secure it at a fair price.)', icon: 'GoldCoin', sound: 'chat' },
+      { action: '品尝街头小吃', result: '烤红薯、糖葫芦、热腾腾的包子...集市上的美食让人目不暇接。(Roasted sweet potato, candied hawthorn, steaming buns... the market food is endless temptation.)', icon: 'Onigiri', sound: 'interact' },
+      { action: '听街头艺人演奏', result: '一个流浪乐师正在弹奏竖琴，悠扬的旋律吸引了不少路人驻足聆听。(A wandering minstrel plays the harp. The melodious tune draws many passersby to listen.)', icon: 'Heart', sound: 'heal' },
+    ],
   },
   'nature': {
     'tree': [
@@ -192,6 +243,15 @@ function getInteractionForZone(zone) {
   else if (zoneName.includes('potion') || zoneName.includes('magic') || zoneName.includes('药水')) category = 'potion';
   else if (zoneName.includes('practice') || zoneName.includes('练习')) category = 'practice';
   else if (zoneName.includes('warehouse') || zoneName.includes('仓库')) category = 'warehouse';
+  else if (zoneName.includes('library') || zoneName.includes('图书')) category = 'library';
+  else if (zoneName.includes('shrine') || zoneName.includes('神社')) category = 'shrine';
+  else if (zoneName.includes('farm') || zoneName.includes('农场')) category = 'farm';
+  else if (zoneName.includes('blacksmith') || zoneName.includes('铁匠')) category = 'blacksmith';
+  else if (zoneName.includes('dock') || zoneName.includes('码头')) category = 'dock';
+  else if (zoneName.includes('garden') || zoneName.includes('花园')) category = 'garden';
+  else if (zoneName.includes('watchtower') || zoneName.includes('瞭望')) category = 'watchtower';
+  else if (zoneName.includes('hot spring') || zoneName.includes('温泉')) category = 'hotspring';
+  else if (zoneName.includes('market') || zoneName.includes('集市')) category = 'marketplace';
   else if (zoneName.includes('tree') || zoneName.includes('树')) category = 'tree';
   else if (zoneName.includes('pond') || zoneName.includes('池塘')) category = 'pond';
   else if (zoneName.includes('grass') || zoneName.includes('草')) category = 'grassland';
@@ -209,6 +269,34 @@ function getInteractionForZone(zone) {
 // Chat history for the log
 const chatHistory = [];
 const MAX_CHAT_HISTORY = 50;
+
+// Activity log per player (for the AI panel)
+const playerActivities = {}; // keyed by socket.id => array of recent activities
+const MAX_ACTIVITIES_PER_PLAYER = 20;
+
+function addPlayerActivity(socketId, activity) {
+  if (!playerActivities[socketId]) playerActivities[socketId] = [];
+  playerActivities[socketId].push({ time: Date.now(), ...activity });
+  if (playerActivities[socketId].length > MAX_ACTIVITIES_PER_PLAYER) {
+    playerActivities[socketId].shift();
+  }
+  // Broadcast activity update to web viewers
+  broadcastActivityToWeb(socketId);
+}
+
+function broadcastActivityToWeb(socketId) {
+  if (sseClients.length === 0) return;
+  const player = gameState.players[socketId];
+  if (!player) return;
+  const data = {
+    id: socketId,
+    name: player.name,
+    sprite: player.sprite,
+    activities: playerActivities[socketId] || []
+  };
+  const dataString = `event: activity\ndata: ${JSON.stringify(data)}\n\n`;
+  sseClients.forEach(client => client.res.write(dataString));
+}
 
 function addChatHistory(playerName, message) {
   chatHistory.push({
@@ -290,6 +378,7 @@ io.on('connection', (socket) => {
     socket.emit('mapDirectory', directory);
     io.emit('stateUpdate', gameState.players);
     broadcastStateToWeb();
+    addPlayerActivity(socket.id, { type: 'join', text: `加入了小镇 (角色: ${sprite})` });
   });
 
   // Allow character change after joining
@@ -341,6 +430,7 @@ io.on('connection', (socket) => {
 
     io.emit('stateUpdate', gameState.players);
     broadcastStateToWeb(); // Bug fix: broadcast move events to SSE web viewers
+    addPlayerActivity(socket.id, { type: 'move', text: `移动到 (${player.x}, ${player.y}) - ${player.currentZoneName}` });
   });
 
   socket.on('say', (msg) => {
@@ -351,6 +441,7 @@ io.on('connection', (socket) => {
       const chatEntry = { time: Date.now(), name: gameState.players[socket.id].name, message: msg };
       addChatHistory(chatEntry.name, chatEntry.message);
       broadcastChatToWeb(chatEntry);
+      addPlayerActivity(socket.id, { type: 'say', text: `说: "${msg.substring(0, 30)}${msg.length > 30 ? '...' : ''}"` });
 
       io.emit('stateUpdate', gameState.players);
       setTimeout(() => {
@@ -400,6 +491,7 @@ io.on('connection', (socket) => {
       result: interaction.result
     };
     broadcastInteractionToWeb(entry);
+    addPlayerActivity(socket.id, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${interaction.action}` });
 
     if (typeof callback === 'function') {
       callback({ success: true, zone: zone ? zone.name : '小镇街道', ...interaction });
@@ -420,6 +512,7 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     delete gameState.players[socket.id];
+    delete playerActivities[socket.id];
     io.emit('stateUpdate', gameState.players);
     broadcastStateToWeb();
   });
