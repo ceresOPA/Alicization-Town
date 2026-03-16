@@ -8,6 +8,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
+const PORT = process.env.PORT || 5660;
 app.use(express.static('public'));
 
 // ==========================================
@@ -91,6 +92,10 @@ app.get('/events', (req, res) => {
   sseClients.push({ id: clientId, res: res });
   console.log(`📺 新的网页观察者已连接 (ID: ${clientId})`);
 
+  // Send initial state immediately so new viewers see current players
+  const initData = `data: ${JSON.stringify(gameState.players)}\n\n`;
+  res.write(initData);
+
   // 网页关闭时，从列表中移除
   req.on('close', () => {
     sseClients = sseClients.filter(client => client.id !== clientId);
@@ -143,27 +148,33 @@ io.on('connection', (socket) => {
     if (!player) return;
 
     player.lastDirection = data.direction;
-    let newX = player.x, newY = player.y;
-    if (data.direction === 'N') newY -= data.steps;
-    if (data.direction === 'S') newY += data.steps;
-    if (data.direction === 'W') newX -= data.steps;
-    if (data.direction === 'E') newX += data.steps;
+    const steps = Math.max(1, Math.min(data.steps, 20)); // Clamp steps to prevent abuse
 
-    newX = Math.max(0, Math.min(worldMap.width - 1, newX));
-    newY = Math.max(0, Math.min(worldMap.height - 1, newY));
+    // Step-by-step collision: walk each tile along the path, stop at first obstacle
+    const dx = data.direction === 'E' ? 1 : data.direction === 'W' ? -1 : 0;
+    const dy = data.direction === 'S' ? 1 : data.direction === 'N' ? -1 : 0;
 
-    // 碰撞检测
-    if (collisionMap[newY * worldMap.width + newX] !== 1) {
-      player.x = newX;
-      player.y = newY;
-      
-      // 更新玩家所在的语义区域
-      const zone = getZoneAt(player.x, player.y);
-      player.currentZoneName = zone ? zone.name : "小镇街道";
-      player.currentZoneDesc = zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道";
+    for (let i = 0; i < steps; i++) {
+      const nextX = player.x + dx;
+      const nextY = player.y + dy;
+
+      // Bounds check
+      if (nextX < 0 || nextX >= worldMap.width || nextY < 0 || nextY >= worldMap.height) break;
+
+      // Collision check per tile
+      if (collisionMap[nextY * worldMap.width + nextX] === 1) break;
+
+      player.x = nextX;
+      player.y = nextY;
     }
 
+    // Update semantic zone
+    const zone = getZoneAt(player.x, player.y);
+    player.currentZoneName = zone ? zone.name : "小镇街道";
+    player.currentZoneDesc = zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道";
+
     io.emit('stateUpdate', gameState.players);
+    broadcastStateToWeb(); // Bug fix: broadcast move events to SSE web viewers
   });
 
   socket.on('say', (msg) => {
@@ -199,4 +210,4 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(5660, () => console.log(`🌍 Underworld 已启动: http://localhost:5660`));
+server.listen(PORT, () => console.log(`🌍 Underworld 已启动: http://localhost:${PORT}`));

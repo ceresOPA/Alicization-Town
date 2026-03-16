@@ -5,7 +5,8 @@ const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontext
 const { io } = require('socket.io-client');
 
 const myName = process.env.BOT_NAME || 'Alice';
-const socket = io('http://localhost:5660');
+const serverUrl = process.env.SERVER_URL || 'http://localhost:5660';
+const socket = io(serverUrl);
 
 let myState = null;
 let allPlayers = {};
@@ -61,58 +62,60 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  // 在工具执行前，立刻告诉服务器：“我开始思考/行动了！”
+  // Set thinking state before tool execution
   socket.emit('playerStateUpdate', { isThinking: true });
 
-  if (name === 'walk') {
-    socket.emit('move', { direction: args.direction, steps: args.steps });
-    return { content:[{ type: 'text', text: `你试图向 ${args.direction} 走 ${args.steps} 步。请用 look_around 确认是否到达，或是否撞墙。` }] };
-  } 
-  
-  if (name === 'say') {
-    socket.emit('say', args.text);
-    return { content:[{ type: 'text', text: `你说: ${args.text}` }] };
-  }
-
-  if (name === 'look_around') {
-    if (!myState) return { content:[{ type: 'text', text: '你还没进入小镇。' }] };
-    
-    let info = `📍 【位置感知】\n你当前坐标: (${myState.x}, ${myState.y})\n`;
-    if (myState.currentZoneName === "小镇街道") {
-       info += `你目前身处: 【小镇街道】\n环境描述: 空旷的街道\n\n`;
-    } else {
-       info += `你目前位于或临近: 【${myState.currentZoneName}】\n环境描述: ${myState.currentZoneDesc}\n\n`;
+  try {
+    if (name === 'walk') {
+      socket.emit('move', { direction: args.direction, steps: args.steps });
+      return { content:[{ type: 'text', text: `你试图向 ${args.direction} 走 ${args.steps} 步。请用 look_around 确认是否到达，或是否撞墙。` }] };
     }
 
-    const others = Object.values(allPlayers).filter(p => p.id !== socket.id && p.name !== 'Observer');
-    if (others.length === 0) {
-      info += '四周空无一人。';
-    } else {
-      info += '👥 【附近的人】\n';
-      others.forEach(p => {
-        const dist = Math.abs(p.x - myState.x) + Math.abs(p.y - myState.y);
-        if (dist <= 10) {
-           info += `- ${p.name} 距离你 ${dist} 步 (位于 ${p.currentZoneName})`;
-           if (p.message) info += `，他正在说: "${p.message}"`;
-           info += '\n';
-        }
+    if (name === 'say') {
+      socket.emit('say', args.text);
+      return { content:[{ type: 'text', text: `你说: ${args.text}` }] };
+    }
+
+    if (name === 'look_around') {
+      if (!myState) return { content:[{ type: 'text', text: '你还没进入小镇。' }] };
+
+      let info = `📍 【位置感知】\n你当前坐标: (${myState.x}, ${myState.y})\n`;
+      if (myState.currentZoneName === "小镇街道") {
+         info += `你目前身处: 【小镇街道】\n环境描述: 空旷的街道\n\n`;
+      } else {
+         info += `你目前位于或临近: 【${myState.currentZoneName}】\n环境描述: ${myState.currentZoneDesc}\n\n`;
+      }
+
+      const others = Object.values(allPlayers).filter(p => p.id !== socket.id && p.name !== 'Observer');
+      if (others.length === 0) {
+        info += '四周空无一人。';
+      } else {
+        info += '👥 【附近的人】\n';
+        others.forEach(p => {
+          const dist = Math.abs(p.x - myState.x) + Math.abs(p.y - myState.y);
+          if (dist <= 10) {
+             info += `- ${p.name} 距离你 ${dist} 步 (位于 ${p.currentZoneName})`;
+             if (p.message) info += `，他正在说: "${p.message}"`;
+             info += '\n';
+          }
+        });
+      }
+
+      return { content:[{ type: 'text', text: info }] };
+    }
+
+    if (name === 'read_map_directory') {
+      if (townDirectory.length === 0) return { content:[{ type: 'text', text: '小镇目前没有任何标记的特殊区域。' }] };
+      let info = "📜 【旅游指南】以下是小镇中所有重要地点及其中心坐标：\n\n";
+      townDirectory.forEach(place => {
+        info += `🔹 [${place.name}] -> 坐标: (${place.x}, ${place.y})\n   说明: ${place.description}\n`;
       });
+      info += "\n💡 提示: 使用 walk 工具前往你想去的地方。";
+      return { content:[{ type: 'text', text: info }] };
     }
-
-    // 工具执行完毕，告诉服务器：“我思考完了！”
+  } finally {
+    // Always reset thinking state after tool execution completes
     socket.emit('playerStateUpdate', { isThinking: false });
-
-    return { content:[{ type: 'text', text: info }] };
-  }
-
-  if (name === 'read_map_directory') {
-    if (townDirectory.length === 0) return { content:[{ type: 'text', text: '小镇目前没有任何标记的特殊区域。' }] };
-    let info = "📜 【旅游指南】以下是小镇中所有重要地点及其中心坐标：\n\n";
-    townDirectory.forEach(place => {
-      info += `🔹 [${place.name}] -> 坐标: (${place.x}, ${place.y})\n   说明: ${place.description}\n`;
-    });
-    info += "\n💡 提示: 使用 walk 工具前往你想去的地方。";
-    return { content:[{ type: 'text', text: info }] };
   }
 });
 
