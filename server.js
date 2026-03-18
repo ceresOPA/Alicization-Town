@@ -153,12 +153,6 @@ const ZONE_INTERACTIONS = {
       { action: '查看库存', result: '仓库里堆满了各种物资：粮食、药草、矿石、木材。管理员正在清点货物。(The warehouse is stocked with supplies: grain, herbs, ore, timber. The manager is taking inventory.)', icon: 'GoldCoin', sound: 'interact' },
       { action: '发现一个旧箱子', result: '角落里有个落灰的旧箱子，打开一看，里面有几枚古老的金币和一张泛黄的地图。(A dusty old crate in the corner. Inside: ancient gold coins and a yellowed map.)', icon: 'GoldKey', sound: 'interact' },
     ],
-    'library': [
-      { action: '翻阅古籍', result: '你找到了一本关于小镇历史的古老典籍，里面记载着传说中地下迷宫的入口就在神社附近。(You find an ancient tome about town history. It mentions a legendary underground labyrinth entrance near the shrine.)', icon: 'GoldKey', sound: 'interact' },
-      { action: '研究地图', result: '书架上有一幅详细的地区地图，标注了周围山脉中的矿脉位置和远古遗迹。(A detailed regional map on the shelf marks ore veins in surrounding mountains and ancient ruins.)', icon: 'GoldCoin', sound: 'interact' },
-      { action: '和图书管理员聊天', result: '管理员是个博学的老者，他说："最近有人在花园里发现了发光的石头，可能是魔法水晶。"(The learned librarian says: "Someone recently found glowing stones in the garden — possibly magic crystals.")', icon: 'FortuneCookie', sound: 'chat' },
-      { action: '安静地阅读', result: '你在窗边找了个位子，沉浸在一本冒险小说中。午后的阳光照在书页上，十分惬意。(You find a window seat and lose yourself in an adventure novel. Afternoon sun warms the pages.)', icon: 'Heart', sound: 'heal' },
-    ],
     'shrine': [
       { action: '在许愿池投硬币', result: '金币在空中旋转，落入清澈的池水中。你许了一个愿望，感到心中充满希望。(The coin spins through the air into clear water. You make a wish and feel filled with hope.)', icon: 'GoldCoin', sound: 'magic' },
       { action: '参拜神社', result: '你双手合十虔诚地参拜。一阵温暖的微风吹过，似乎有一股神秘的力量在回应你。(You clasp your hands and pray. A warm breeze passes — some mysterious power seems to respond.)', icon: 'Heart', sound: 'magic' },
@@ -182,11 +176,6 @@ const ZONE_INTERACTIONS = {
       { action: '检查停泊的小船', result: '一艘小船的船舱里藏着一张航海图，上面标记着"龙之岛"的位置。(A boat\'s cabin hides a nautical chart marking the location of "Dragon Island".)', icon: 'GoldKey', sound: 'interact' },
       { action: '和渔夫聊天', result: '老渔夫说："最近海里出现了发光的鱼，老一辈说那是海神的使者。"(The old fisherman says: "Glowing fish appeared lately. Elders say they\'re messengers of the sea god.")', icon: 'FortuneCookie', sound: 'chat' },
       { action: '望向远方的海面', result: '夕阳映照在海面上，金光粼粼。远处隐约可见一座小岛的轮廓。(Sunset reflects golden on the water. A faint island silhouette appears in the distance.)', icon: 'WaterPot', sound: 'heal' },
-    ],
-    'garden': [
-      { action: '在花丛中漫步', result: '玫瑰、薰衣草、向日葵...每一朵花都散发着独特的香气。蝴蝶停在你的肩头。(Roses, lavender, sunflowers... each with its own fragrance. A butterfly lands on your shoulder.)', icon: 'Heart', sound: 'heal' },
-      { action: '采集稀有花草', result: '你发现了一株发着淡淡蓝光的花朵，这是传说中的"月光花"，据说有神奇的药用价值。(You find a faintly glowing blue flower — the legendary "Moonflower" said to have miraculous medicinal properties.)', icon: 'LifePot', sound: 'magic' },
-      { action: '和园丁交谈', result: '园丁说："这些花需要用温泉水浇灌才能开得这么好，你去看看那边的温泉吧。"(The gardener says: "These flowers bloom so well because of hot spring water. You should visit the springs.")', icon: 'FortuneCookie', sound: 'chat' },
     ],
     'watchtower': [
       { action: '登上塔顶瞭望', result: '从塔顶可以看到整个小镇的全貌：北边的仓库、南边的农场、东边的花园...一切尽收眼底。(From the tower top you see the whole town: warehouse to the north, farm to the south, garden to the east...)', icon: 'Bow', sound: 'interact' },

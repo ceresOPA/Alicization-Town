@@ -47,12 +47,12 @@ socket.on('mapDirectory', (dir) => {
 // 🐶 看门狗 (Watchdog) 逻辑
 // ==========================================
 let heartbeatTimeout = null;
-const TIMEOUT_LIMIT = 30000; // 30秒无响应则自杀
+const TIMEOUT_LIMIT = 300000; // 300秒无响应则自杀
 
 function resetWatchdog() {
   if (heartbeatTimeout) clearTimeout(heartbeatTimeout);
   
-  // 如果 30 秒内没有触发 resetWatchdog，执行自杀
+  // 如果 300 秒内没有触发 resetWatchdog，执行自杀
   heartbeatTimeout = setTimeout(() => {
     console.error("💀 [系统提示] 检测到与服务器连接超时，正在执行自我清理并退出...");
     gracefulExit();
