@@ -4,11 +4,13 @@ const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 const PORT = process.env.PORT || 5660;
+app.use(express.json());
 app.use(express.static('public'));
 
 // ==========================================
@@ -507,4 +509,374 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(PORT, () => console.log(`🌍 Underworld 已启动: http://localhost:${PORT}`));
+// ==========================================
+// 🧭 A* 寻路引擎
+// ==========================================
+function findNearestWalkable(tx, ty) {
+  const W = worldMap.width, H = worldMap.height;
+  const visited = new Set();
+  const queue = [{ x: tx, y: ty }];
+  visited.add(`${tx},${ty}`);
+  while (queue.length > 0) {
+    const { x, y } = queue.shift();
+    if (x >= 0 && x < W && y >= 0 && y < H && collisionMap[y * W + x] !== 1) return { x, y };
+    for (const [dx, dy] of [[0,-1],[0,1],[1,0],[-1,0]]) {
+      const nx = x + dx, ny = y + dy, k = `${nx},${ny}`;
+      if (!visited.has(k) && nx >= 0 && nx < W && ny >= 0 && ny < H) { visited.add(k); queue.push({ x: nx, y: ny }); }
+    }
+  }
+  return null;
+}
+
+function findPath(startX, startY, goalX, goalY) {
+  const W = worldMap.width, H = worldMap.height;
+  let gx = goalX, gy = goalY;
+
+  if (gx < 0 || gx >= W || gy < 0 || gy >= H || collisionMap[gy * W + gx] === 1) {
+    const w = findNearestWalkable(gx, gy);
+    if (!w) return null;
+    gx = w.x; gy = w.y;
+  }
+  if (startX === gx && startY === gy) return { path: [], goalX: gx, goalY: gy };
+
+  const idx = (x, y) => y * W + x;
+  const open = [{ x: startX, y: startY, g: 0, f: Math.abs(startX - gx) + Math.abs(startY - gy) }];
+  const gScores = new Float64Array(W * H).fill(Infinity);
+  gScores[idx(startX, startY)] = 0;
+  const parent = new Int32Array(W * H).fill(-1);
+  const closed = new Uint8Array(W * H);
+
+  while (open.length > 0) {
+    let mi = 0;
+    for (let i = 1; i < open.length; i++) { if (open[i].f < open[mi].f) mi = i; }
+    const cur = open[mi];
+    open[mi] = open[open.length - 1]; open.pop();
+
+    const ck = idx(cur.x, cur.y);
+    if (closed[ck]) continue;
+    closed[ck] = 1;
+
+    if (cur.x === gx && cur.y === gy) {
+      const path = [];
+      let k = ck;
+      while (k !== idx(startX, startY)) { path.push({ x: k % W, y: Math.floor(k / W) }); k = parent[k]; }
+      path.reverse();
+      return { path, goalX: gx, goalY: gy };
+    }
+
+    for (const [dx, dy] of [[0,-1],[0,1],[1,0],[-1,0]]) {
+      const nx = cur.x + dx, ny = cur.y + dy;
+      if (nx < 0 || nx >= W || ny < 0 || ny >= H) continue;
+      const nk = idx(nx, ny);
+      if (closed[nk] || collisionMap[nk] === 1) continue;
+      const ng = cur.g + 1;
+      if (ng < gScores[nk]) {
+        gScores[nk] = ng;
+        parent[nk] = ck;
+        open.push({ x: nx, y: ny, g: ng, f: ng + Math.abs(nx - gx) + Math.abs(ny - gy) });
+      }
+    }
+  }
+  return null;
+}
+
+function compressPath(startX, startY, path) {
+  if (!path || path.length === 0) return [];
+  const steps = [];
+  let px = startX, py = startY;
+  for (const p of path) {
+    const dx = p.x - px, dy = p.y - py;
+    const dir = dx === 1 ? 'E' : dx === -1 ? 'W' : dy === 1 ? 'S' : 'N';
+    if (steps.length > 0 && steps[steps.length - 1].direction === dir) steps[steps.length - 1].steps++;
+    else steps.push({ direction: dir, steps: 1 });
+    px = p.x; py = p.y;
+  }
+  return steps;
+}
+
+// ==========================================
+// 🌐 REST API — 让 AI 通过 HTTP 接口控制角色
+// ==========================================
+const apiSessions = new Map(); // token -> { playerId, lastActivity }
+const API_TIMEOUT = 5 * 60 * 1000; // 5 分钟无活动自动清理
+
+// 定期清理不活跃的 API 玩家
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, session] of apiSessions) {
+    if (now - session.lastActivity > API_TIMEOUT) {
+      delete gameState.players[session.playerId];
+      apiSessions.delete(token);
+      console.log(`🧹 清理不活跃的 API 玩家: ${session.playerId}`);
+      io.emit('stateUpdate', gameState.players);
+      broadcastStateToWeb();
+    }
+  }
+}, 60000);
+
+// 鉴权中间件
+function apiAuth(req, res, next) {
+  const token = req.headers['authorization']?.replace('Bearer ', '');
+  if (!token || !apiSessions.has(token)) {
+    return res.status(401).json({ error: '未加入小镇，请先调用 POST /api/join' });
+  }
+  const session = apiSessions.get(token);
+  session.lastActivity = Date.now();
+  req.playerId = session.playerId;
+  req.player = gameState.players[session.playerId];
+  if (!req.player) {
+    apiSessions.delete(token);
+    return res.status(401).json({ error: '会话已过期，请重新 join' });
+  }
+  next();
+}
+
+// GET /api/status — 查询某个名字是否已在小镇
+app.get('/api/status', (req, res) => {
+  const { name } = req.query;
+  if (!name) return res.status(400).json({ error: '需要提供 name 参数' });
+
+  const player = Object.values(gameState.players).find(p => p.name === name);
+  if (player) {
+    return res.json({ online: true, position: { x: player.x, y: player.y }, zone: player.currentZoneName });
+  }
+  res.json({ online: false });
+});
+
+// POST /api/join — 加入小镇（同名自动恢复已有会话）
+app.post('/api/join', (req, res) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: '需要提供 name' });
+
+  // 同名去重：如果已有同名玩家，返回已有会话
+  const existingPlayerId = Object.keys(gameState.players).find(id => gameState.players[id].name === name);
+  if (existingPlayerId) {
+    for (const [existingToken, session] of apiSessions) {
+      if (session.playerId === existingPlayerId) {
+        session.lastActivity = Date.now();
+        const player = gameState.players[existingPlayerId];
+        console.log(`🔄 API 玩家恢复会话: ${name} (${existingPlayerId})`);
+        return res.json({ token: existingToken, playerId: existingPlayerId, name, position: { x: player.x, y: player.y }, resumed: true });
+      }
+    }
+  }
+
+  const token = crypto.randomUUID();
+  const playerId = `api_${token.slice(0, 8)}`;
+  const spawnX = 5, spawnY = 5;
+  const zone = getZoneAt(spawnX, spawnY);
+
+  gameState.players[playerId] = {
+    id: playerId, name, x: spawnX, y: spawnY, lastDirection: 'S',
+    message: '', interactionText: '', isThinking: false,
+    currentZoneName: zone ? zone.name : "小镇街道",
+    currentZoneDesc: zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道"
+  };
+
+  apiSessions.set(token, { playerId, lastActivity: Date.now() });
+  io.emit('stateUpdate', gameState.players);
+  broadcastStateToWeb();
+
+  console.log(`🌐 API 玩家加入: ${name} (${playerId})`);
+  res.json({ token, playerId, name, position: { x: spawnX, y: spawnY } });
+});
+
+// POST /api/walk — 移动
+app.post('/api/walk', apiAuth, (req, res) => {
+  const player = req.player;
+  const { direction, steps: rawSteps } = req.body;
+
+  if (!['N', 'S', 'E', 'W'].includes(direction)) {
+    return res.status(400).json({ error: 'direction 必须是 N/S/E/W' });
+  }
+
+  const steps = Math.max(1, Math.min(rawSteps || 1, 20));
+  player.lastDirection = direction;
+
+  const dx = direction === 'E' ? 1 : direction === 'W' ? -1 : 0;
+  const dy = direction === 'S' ? 1 : direction === 'N' ? -1 : 0;
+  let moved = 0;
+
+  for (let i = 0; i < steps; i++) {
+    const nextX = player.x + dx;
+    const nextY = player.y + dy;
+    if (nextX < 0 || nextX >= worldMap.width || nextY < 0 || nextY >= worldMap.height) break;
+    if (collisionMap[nextY * worldMap.width + nextX] === 1) break;
+    player.x = nextX;
+    player.y = nextY;
+    moved++;
+  }
+
+  const zone = getZoneAt(player.x, player.y);
+  player.currentZoneName = zone ? zone.name : "小镇街道";
+  player.currentZoneDesc = zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道";
+
+  io.emit('stateUpdate', gameState.players);
+  broadcastStateToWeb();
+
+  res.json({
+    moved,
+    position: { x: player.x, y: player.y },
+    zone: player.currentZoneName,
+    blocked: moved < steps
+  });
+});
+
+// POST /api/say — 说话
+app.post('/api/say', apiAuth, (req, res) => {
+  const player = req.player;
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: '需要提供 text' });
+
+  player.message = text;
+
+  const chatEntry = { time: Date.now(), name: player.name, message: text };
+  addChatHistory(chatEntry.name, chatEntry.message);
+  broadcastChatToWeb(chatEntry);
+
+  io.emit('stateUpdate', gameState.players);
+  broadcastStateToWeb();
+
+  setTimeout(() => {
+    if (gameState.players[req.playerId]) {
+      gameState.players[req.playerId].message = '';
+      io.emit('stateUpdate', gameState.players);
+      broadcastStateToWeb();
+    }
+  }, 5000);
+
+  res.json({ ok: true });
+});
+
+// GET /api/look — 环顾四周
+app.get('/api/look', apiAuth, (req, res) => {
+  const player = req.player;
+
+  const nearby = Object.values(gameState.players)
+    .filter(p => p.id !== req.playerId && p.name !== 'Observer')
+    .map(p => {
+      const dist = Math.abs(p.x - player.x) + Math.abs(p.y - player.y);
+      return { name: p.name, distance: dist, zone: p.currentZoneName, message: p.message || undefined };
+    })
+    .filter(p => p.distance <= 10);
+
+  res.json({
+    position: { x: player.x, y: player.y },
+    zone: player.currentZoneName,
+    zoneDesc: player.currentZoneDesc,
+    nearby
+  });
+});
+
+// GET /api/map — 获取地图名录
+app.get('/api/map', (req, res) => {
+  const directory = semanticZones.map(z => ({
+    name: z.name,
+    x: Math.floor((z.x + z.width / 2) / worldMap.tilewidth),
+    y: Math.floor((z.y + z.height / 2) / worldMap.tileheight),
+    description: z.properties?.find(p => p.name === 'description')?.value || ''
+  }));
+  res.json(directory);
+});
+
+// POST /api/interact — 与当前区域互动
+app.post('/api/interact', apiAuth, (req, res) => {
+  const player = req.player;
+  const zone = getZoneAt(player.x, player.y);
+  const interaction = getInteractionForZone(zone);
+
+  player.interactionText = interaction.action;
+  io.emit('stateUpdate', gameState.players);
+  broadcastStateToWeb();
+
+  setTimeout(() => {
+    if (gameState.players[req.playerId]) {
+      gameState.players[req.playerId].interactionText = '';
+      io.emit('stateUpdate', gameState.players);
+      broadcastStateToWeb();
+    }
+  }, 4000);
+
+  const entry = {
+    time: Date.now(), name: player.name,
+    zone: zone ? zone.name : '小镇街道',
+    action: interaction.action, result: interaction.result
+  };
+  broadcastInteractionToWeb(entry);
+
+  res.json({ zone: entry.zone, action: interaction.action, result: interaction.result });
+});
+
+// POST /api/navigate — 自动寻路到目标（支持地点名或坐标）
+app.post('/api/navigate', apiAuth, (req, res) => {
+  const player = req.player;
+  const { destination, x, y } = req.body;
+
+  let targetX, targetY, targetName;
+
+  if (destination) {
+    const query = destination.toLowerCase();
+    const zone = semanticZones.find(z => z.name.toLowerCase().includes(query));
+    if (!zone) return res.status(404).json({ error: `找不到地点: ${destination}` });
+    targetX = Math.floor((zone.x + zone.width / 2) / worldMap.tilewidth);
+    targetY = Math.floor((zone.y + zone.height / 2) / worldMap.tileheight);
+    targetName = zone.name;
+  } else if (x !== undefined && y !== undefined) {
+    targetX = Math.round(x);
+    targetY = Math.round(y);
+    const zone = getZoneAt(targetX, targetY);
+    targetName = zone ? zone.name : '小镇街道';
+  } else {
+    return res.status(400).json({ error: '需要提供 destination(地点名) 或 x,y 坐标' });
+  }
+
+  const result = findPath(player.x, player.y, targetX, targetY);
+  if (!result) return res.status(400).json({ error: '无法找到通往目标的路径' });
+
+  const { path, goalX, goalY } = result;
+  if (path.length === 0) {
+    return res.json({ message: '你已经在目标位置了', position: { x: player.x, y: player.y }, zone: player.currentZoneName });
+  }
+
+  const startX = player.x, startY = player.y;
+  const finalPos = path[path.length - 1];
+  player.x = finalPos.x;
+  player.y = finalPos.y;
+
+  // 更新朝向为最后一步的方向
+  if (path.length >= 2) {
+    const last = path[path.length - 1], prev = path[path.length - 2];
+    const dx = last.x - prev.x, dy = last.y - prev.y;
+    player.lastDirection = dx === 1 ? 'E' : dx === -1 ? 'W' : dy === 1 ? 'S' : 'N';
+  }
+
+  const zone = getZoneAt(player.x, player.y);
+  player.currentZoneName = zone ? zone.name : "小镇街道";
+  player.currentZoneDesc = zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道";
+
+  io.emit('stateUpdate', gameState.players);
+  broadcastStateToWeb();
+
+  res.json({
+    destination: targetName,
+    from: { x: startX, y: startY },
+    to: { x: player.x, y: player.y },
+    totalSteps: path.length,
+    route: compressPath(startX, startY, path),
+    zone: player.currentZoneName
+  });
+});
+
+// POST /api/leave — 离开小镇
+app.post('/api/leave', apiAuth, (req, res) => {
+  const name = req.player.name;
+  delete gameState.players[req.playerId];
+  const token = req.headers['authorization']?.replace('Bearer ', '');
+  apiSessions.delete(token);
+  io.emit('stateUpdate', gameState.players);
+  broadcastStateToWeb();
+  console.log(`👋 API 玩家离开: ${name}`);
+  res.json({ ok: true });
+});
+
+server.listen(PORT, '0.0.0.0', () => console.log(`🌍 Underworld 已启动: http://0.0.0.0:${PORT}`));
