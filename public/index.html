@@ -172,8 +172,14 @@
     let mouseX = -1, mouseY = -1;
 
     // === Camera ===
-    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 2.0, targetZoom: 2.0 };
+    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 1.0, targetZoom: 1.0 };
     let isCameraFollowing = false;
+    function getMinZoom() {
+      if (!mapData) return 0.5;
+      const mapPxW = mapData.width * TILE_SIZE;
+      const mapPxH = mapData.height * TILE_SIZE;
+      return Math.max(VIEWPORT_W / mapPxW, VIEWPORT_H / mapPxH);
+    }
 
     // Drag state
     let isDragging = false, dragMoved = false;
@@ -272,8 +278,16 @@
         dragMoved = true;
         const dx = (mouseScreenX - dragStartScreen.x) / camera.zoom;
         const dy = (mouseScreenY - dragStartScreen.y) / camera.zoom;
-        camera.x = camera.targetX = dragStartCam.x - dx;
-        camera.y = camera.targetY = dragStartCam.y - dy;
+        let newX = dragStartCam.x - dx;
+        let newY = dragStartCam.y - dy;
+        if (mapData) {
+          const maxX = Math.max(0, mapData.width * TILE_SIZE - VIEWPORT_W / camera.zoom);
+          const maxY = Math.max(0, mapData.height * TILE_SIZE - VIEWPORT_H / camera.zoom);
+          newX = Math.max(0, Math.min(newX, maxX));
+          newY = Math.max(0, Math.min(newY, maxY));
+        }
+        camera.x = camera.targetX = newX;
+        camera.y = camera.targetY = newY;
       }
     });
     canvas.addEventListener('mouseleave', () => { mouseScreenX = -1; mouseScreenY = -1; mouseX = -1; mouseY = -1; });
@@ -303,11 +317,19 @@
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.25 : 0.25;
-      camera.targetZoom = Math.max(1.0, Math.min(4.0, camera.targetZoom + delta));
+      camera.targetZoom = Math.max(getMinZoom(), Math.min(4.0, camera.targetZoom + delta));
       if (mouseScreenX >= 0) {
         const nz = camera.targetZoom;
-        camera.x = camera.targetX = mouseX - mouseScreenX / nz;
-        camera.y = camera.targetY = mouseY - mouseScreenY / nz;
+        let newX = mouseX - mouseScreenX / nz;
+        let newY = mouseY - mouseScreenY / nz;
+        if (mapData) {
+          const maxX = Math.max(0, mapData.width * TILE_SIZE - VIEWPORT_W / nz);
+          const maxY = Math.max(0, mapData.height * TILE_SIZE - VIEWPORT_H / nz);
+          newX = Math.max(0, Math.min(newX, maxX));
+          newY = Math.max(0, Math.min(newY, maxY));
+        }
+        camera.x = camera.targetX = newX;
+        camera.y = camera.targetY = newY;
       }
       isCameraFollowing = false;
     }, { passive: false });
@@ -446,10 +468,12 @@
         camera.targetY = p.displayY + TILE_SIZE / 2 - VIEWPORT_H / (2 * camera.zoom);
       }
       if (mapData) {
-        const maxX = mapData.width * TILE_SIZE - VIEWPORT_W / camera.zoom;
-        const maxY = mapData.height * TILE_SIZE - VIEWPORT_H / camera.zoom;
+        const maxX = Math.max(0, mapData.width * TILE_SIZE - VIEWPORT_W / camera.zoom);
+        const maxY = Math.max(0, mapData.height * TILE_SIZE - VIEWPORT_H / camera.zoom);
         camera.targetX = Math.max(0, Math.min(camera.targetX, maxX));
         camera.targetY = Math.max(0, Math.min(camera.targetY, maxY));
+        camera.x = Math.max(0, Math.min(camera.x, maxX));
+        camera.y = Math.max(0, Math.min(camera.y, maxY));
       }
       if (!isDragging) {
         camera.x += (camera.targetX - camera.x) * Math.min(1, dt * 8);
