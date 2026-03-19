@@ -491,6 +491,21 @@ io.on('connection', (socket) => {
         }
       }, 5000);
 
+      // 向附近玩家推送 on_hear 事件（距离 ≤ 10 格）
+      const speaker = gameState.players[socket.id];
+      const HEAR_RANGE = 10;
+      for (const [otherId, other] of Object.entries(gameState.players)) {
+        if (otherId === socket.id) continue;
+        const dist = Math.abs(other.x - speaker.x) + Math.abs(other.y - speaker.y);
+        if (dist <= HEAR_RANGE) {
+          io.to(otherId).emit('on_hear', {
+            from: speaker.name,
+            message: msg,
+            distance: dist,
+            zone: speaker.currentZoneName,
+          });
+        }
+      }
     }
   broadcastStateToWeb();
   });
