@@ -1,8 +1,10 @@
 // mcp-bridge.js
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
+const { SSEServerTransport } = require('@modelcontextprotocol/sdk/server/sse.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const { CallToolRequestSchema, ListToolsRequestSchema } = require('@modelcontextprotocol/sdk/types.js');
 const { io } = require('socket.io-client');
+const express = require('express');
 
 const myName = process.env.BOT_NAME || 'Alice';
 const serverUrl = process.env.SERVER_URL || 'http://localhost:5660';
@@ -59,10 +61,8 @@ function resetWatchdog() {
   }, TIMEOUT_LIMIT);
 }
 
-// ==== MCP 服务器设置 ====
-const mcpServer = new Server({ name: 'alicization-bridge', version: '0.3.0' }, { capabilities: { tools: {} } });
-
-mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
+// ==== MCP 工具定义 ====
+async function listToolsHandler() {
   return {
     tools:[
       { name: 'walk', description: '在小镇移动 (N北/S南/W西/E东)', inputSchema: { type: 'object', properties: { direction: { type: 'string', enum:['N', 'S', 'W', 'E'] }, steps: { type: 'number' } }, required:['direction', 'steps'] } },
@@ -74,9 +74,9 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
       { name: 'choose_character', description: '选择一个角色形象并加入小镇（或在加入后更换形象）。必须先用 list_characters 查看可选角色', inputSchema: { type: 'object', properties: { sprite: { type: 'string', description: '角色名称，从 list_characters 中选取' } }, required: ['sprite'] } }
     ]
   };
-});
+}
 
-mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+async function callToolHandler(request) {
   const { name, arguments: args } = request.params;
 
   // Set thinking state before tool execution
@@ -194,14 +194,59 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     // Always reset thinking state after tool execution completes
     socket.emit('playerStateUpdate', { isThinking: false });
   }
-});
-
-async function start() {
-  const transport = new StdioServerTransport();
-  await mcpServer.connect(transport);
-  console.error('🚀 MCP Bridge 已启动，AI 灵魂翻译机在线...');
 }
-start();
+
+// ==== 启动模式选择 ====
+const useStdio = !process.argv.includes('--http');
+
+if (useStdio) {
+  // stdio 模式（Claude Desktop、Cursor 等）
+  async function startStdio() {
+    const server = new Server({ name: 'alicization-bridge', version: '0.3.0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, listToolsHandler);
+    server.setRequestHandler(CallToolRequestSchema, callToolHandler);
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('🚀 MCP Bridge (stdio) 已启动，AI 灵魂翻译机在线...');
+  }
+  startStdio();
+} else {
+  // SSE HTTP 模式（OpenClaw、mcporter 等）
+  const MCP_PORT = process.env.MCP_PORT || 3100;
+  const httpApp = express();
+
+  const transports = {};
+
+  httpApp.get('/sse', async (req, res) => {
+    const transport = new SSEServerTransport('/message', res);
+    transports[transport.sessionId] = transport;
+
+    res.on('close', () => {
+      delete transports[transport.sessionId];
+    });
+
+    const server = new Server({ name: 'alicization-bridge', version: '0.3.0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, listToolsHandler);
+    server.setRequestHandler(CallToolRequestSchema, callToolHandler);
+    await server.connect(transport);
+  });
+
+  httpApp.post('/message', async (req, res) => {
+    const sessionId = req.query.sessionId;
+    const transport = transports[sessionId];
+    if (!transport) {
+      res.status(400).json({ error: 'Invalid session' });
+      return;
+    }
+    await transport.handlePostMessage(req, res);
+  });
+
+  httpApp.listen(MCP_PORT, () => {
+    console.error(`🚀 MCP Bridge (SSE) 已启动: http://localhost:${MCP_PORT}`);
+    console.error(`   SSE 端点: http://localhost:${MCP_PORT}/sse`);
+    console.error(`   POST 端点: http://localhost:${MCP_PORT}/message`);
+  });
+}
 
 // 监听程序的退出信号
 function gracefulExit() {
