@@ -4,36 +4,27 @@
   <title>Alicization Town</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap');
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #1a1a2e;
-      color: #5c4a3d;
+      background-color: #1a1a2e; color: #5c4a3d;
       font-family: 'Pixelify Sans', 'Comic Sans MS', sans-serif;
       display: flex; flex-direction: column; align-items: center;
       min-height: 100vh; padding: 10px;
     }
     h1 { margin-bottom: 2px; color: #4a8e53; text-shadow: 2px 2px 0px #d4e6d6; font-size: 28px; }
     #status-text { color: #9aa899; margin-top: 0; font-size: 16px; margin-bottom: 6px; }
-
     #main-layout { display: flex; gap: 10px; align-items: flex-start; }
-
     #game-container { position: relative; display: inline-block; flex-shrink: 0; }
     canvas {
-      background-color: #a4d460;
-      border: 6px solid #c8a165;
-      border-radius: 10px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-      image-rendering: pixelated;
-      cursor: crosshair;
+      background-color: #a4d460; border: 6px solid #c8a165; border-radius: 10px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4); image-rendering: pixelated; cursor: grab;
     }
-    #toolbar {
-      position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 10;
-    }
+    canvas.dragging { cursor: grabbing; }
+    #toolbar { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; z-index: 10; }
     .tool-btn {
-      background: rgba(255,255,255,0.88); border: 2px solid #c8a165;
-      border-radius: 8px; padding: 5px 10px; font-family: 'Pixelify Sans', sans-serif;
-      font-size: 13px; cursor: pointer; color: #5c4a3d; transition: background 0.2s;
+      background: rgba(255,255,255,0.88); border: 2px solid #c8a165; border-radius: 8px;
+      padding: 5px 10px; font-family: 'Pixelify Sans', sans-serif; font-size: 13px;
+      cursor: pointer; color: #5c4a3d; transition: background 0.2s;
     }
     .tool-btn:hover { background: rgba(255,255,255,1); }
     #time-display {
@@ -41,31 +32,26 @@
       background: rgba(0,0,0,0.5); color: #ffeaa7; border-radius: 8px;
       padding: 4px 10px; font-size: 14px; font-family: 'Pixelify Sans', sans-serif;
     }
-
-    /* Side panel: chat log + mini-map + AI panel */
-    #side-panel {
-      width: 280px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+    #zoom-hint {
+      position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 10;
+      background: rgba(0,0,0,0.45); color: #aaa; border-radius: 6px;
+      padding: 3px 10px; font-size: 11px; font-family: 'Pixelify Sans', sans-serif;
+      pointer-events: none;
     }
+    #side-panel { width: 280px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
     #minimap-container {
-      background: rgba(40,40,60,0.9); border: 3px solid #c8a165;
-      border-radius: 10px; padding: 8px; text-align: center;
+      background: rgba(40,40,60,0.9); border: 3px solid #c8a165; border-radius: 10px; padding: 8px; text-align: center;
     }
     #minimap-container h3 { color: #ffeaa7; font-size: 14px; margin-bottom: 4px; }
-    #minimapCanvas { border-radius: 6px; image-rendering: pixelated; width: 100%; }
-
-    /* AI Online Panel */
+    #minimapCanvas { border-radius: 6px; image-rendering: pixelated; width: 100%; cursor: crosshair; }
     #ai-panel-container {
-      background: rgba(40,40,60,0.9); border: 3px solid #c8a165;
-      border-radius: 10px; padding: 8px; max-height: 240px;
-      display: flex; flex-direction: column;
+      background: rgba(40,40,60,0.9); border: 3px solid #c8a165; border-radius: 10px;
+      padding: 8px; max-height: 240px; display: flex; flex-direction: column;
     }
     #ai-panel-container h3 { color: #ffeaa7; font-size: 14px; margin-bottom: 4px; flex-shrink: 0; }
     #ai-panel-header { display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
     #ai-count { color: #74b9ff; font-size: 12px; }
-    #ai-list {
-      flex: 1; overflow-y: auto; font-size: 12px; color: #ddd;
-      scrollbar-width: thin; scrollbar-color: #c8a165 transparent;
-    }
+    #ai-list { flex: 1; overflow-y: auto; font-size: 12px; color: #ddd; scrollbar-width: thin; scrollbar-color: #c8a165 transparent; }
     #ai-list::-webkit-scrollbar { width: 5px; }
     #ai-list::-webkit-scrollbar-thumb { background: #c8a165; border-radius: 3px; }
     .ai-card {
@@ -83,12 +69,9 @@
     .ai-status-dot.thinking { background: #fdcb6e; animation: pulse 1s infinite; }
     .ai-status-dot.idle { background: #00b894; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-    /* Activity detail panel */
     #activity-detail {
       display: none; background: rgba(40,40,60,0.95); border: 3px solid #74b9ff;
-      border-radius: 10px; padding: 8px; max-height: 200px;
-      flex-direction: column;
+      border-radius: 10px; padding: 8px; max-height: 200px; flex-direction: column;
     }
     #activity-detail.visible { display: flex; }
     #activity-detail h3 { color: #74b9ff; font-size: 14px; margin-bottom: 4px; flex-shrink: 0; }
@@ -105,17 +88,20 @@
     .activity-type-say { color: #74b9ff; }
     .activity-type-interact { color: #fdcb6e; }
     .activity-type-join { color: #00b894; }
-
+    /* Stats panel */
+    #stats-panel {
+      background: rgba(40,40,60,0.9); border: 3px solid #a29bfe; border-radius: 10px; padding: 8px;
+    }
+    #stats-panel h3 { color: #a29bfe; font-size: 14px; margin-bottom: 6px; }
+    .stat-row { font-size: 12px; color: #dfe6e9; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.06); line-height: 1.5; }
+    .stat-name { color: #fdcb6e; font-weight: 700; }
+    #stats-empty { color: #636e72; font-size: 11px; font-style: italic; }
     #chatlog-container {
-      background: rgba(40,40,60,0.9); border: 3px solid #c8a165;
-      border-radius: 10px; padding: 8px; flex: 1; min-height: 200px; max-height: 400px;
-      display: flex; flex-direction: column;
+      background: rgba(40,40,60,0.9); border: 3px solid #c8a165; border-radius: 10px;
+      padding: 8px; flex: 1; min-height: 200px; max-height: 400px; display: flex; flex-direction: column;
     }
     #chatlog-container h3 { color: #ffeaa7; font-size: 14px; margin-bottom: 4px; flex-shrink: 0; }
-    #chatlog {
-      flex: 1; overflow-y: auto; font-size: 12px; color: #ddd;
-      scrollbar-width: thin; scrollbar-color: #c8a165 transparent;
-    }
+    #chatlog { flex: 1; overflow-y: auto; font-size: 12px; color: #ddd; scrollbar-width: thin; scrollbar-color: #c8a165 transparent; }
     #chatlog::-webkit-scrollbar { width: 5px; }
     #chatlog::-webkit-scrollbar-thumb { background: #c8a165; border-radius: 3px; }
     .chat-entry { margin-bottom: 4px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.08); line-height: 1.4; }
@@ -135,6 +121,7 @@
         <button class="tool-btn" id="music-toggle">Music OFF</button>
       </div>
       <canvas id="gameCanvas" width="800" height="600"></canvas>
+      <div id="zoom-hint">滚轮缩放 · 拖拽平移 · 点击角色跟随</div>
     </div>
     <div id="side-panel">
       <div id="minimap-container">
@@ -152,6 +139,10 @@
         <h3>Activity: <span id="activity-detail-name"></span></h3>
         <div id="activity-log"></div>
       </div>
+      <div id="stats-panel">
+        <h3>📊 Stats</h3>
+        <div id="stats-content"><span id="stats-empty">Waiting for data...</span></div>
+      </div>
       <div id="chatlog-container">
         <h3>Chat Log</h3>
         <div id="chatlog"></div>
@@ -160,13 +151,13 @@
   </div>
 
   <script>
-    // === PLACEHOLDER: Core variables ===
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const miniCanvas = document.getElementById('minimapCanvas');
     const miniCtx = miniCanvas.getContext('2d');
     const chatlogEl = document.getElementById('chatlog');
     const TILE_SIZE = 26;
+    const VIEWPORT_W = 800, VIEWPORT_H = 600;
 
     let PLAYER_W = 16, PLAYER_H = 16;
     let mapData = null;
@@ -174,42 +165,60 @@
     const images = {};
     let imagesLoaded = 0;
     let totalImagesToLoad = 1;
-    let mouseX = -1, mouseY = -1;
     let isGameLoopRunning = false;
 
-    // === PLACEHOLDER: Day/night cycle state ===
-    let gameTime = 6 * 60; // minutes since midnight, start at 6:00 AM
-    const TIME_SPEED = 0.01; // game minutes per real second
+    // Mouse — screen space and world space
+    let mouseScreenX = -1, mouseScreenY = -1;
+    let mouseX = -1, mouseY = -1;
 
-    // === PLACEHOLDER: Particle system ===
+    // === Camera ===
+    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 2.0, targetZoom: 2.0 };
+    let isCameraFollowing = false;
+
+    // Drag state
+    let isDragging = false, dragMoved = false;
+    let dragStartScreen = { x: 0, y: 0 };
+    let dragStartCam = { x: 0, y: 0 };
+
+    // === Player trail history ===
+    const playerTrails = {};
+    const MAX_TRAIL = 25;
+
+    // Hovered player (for hover card)
+    let hoveredPlayerId = null;
+
+    // === Day/night ===
+    let gameTime = 6 * 60;
+    const TIME_SPEED = 0.01;
+
+    // === Particles ===
     let particles = [];
 
-    // === PLACEHOLDER: Chat log data ===
+    // === Chat ===
     let chatMessages = [];
     const MAX_DISPLAY_MESSAGES = 100;
 
-    // === AI Panel state ===
+    // === AI Panel ===
     let selectedPlayerId = null;
-    let playerActivityData = {}; // keyed by socket id
+    let playerActivityData = {};
     const aiListEl = document.getElementById('ai-list');
     const aiCountEl = document.getElementById('ai-count');
     const activityDetailEl = document.getElementById('activity-detail');
     const activityDetailNameEl = document.getElementById('activity-detail-name');
     const activityLogEl = document.getElementById('activity-log');
 
-    // === Background music ===
+    // === Music ===
     const bgm = new Audio('assets/musics/36-Village.ogg');
     bgm.loop = true; bgm.volume = 0.3;
     let musicPlaying = false;
-    const musicBtn = document.getElementById('music-toggle');
-    musicBtn.addEventListener('click', () => {
+    document.getElementById('music-toggle').addEventListener('click', () => {
       musicPlaying = !musicPlaying;
-      if (musicPlaying) { bgm.play().catch(() => {}); musicBtn.textContent = 'Music ON'; }
-      else { bgm.pause(); musicBtn.textContent = 'Music OFF'; }
+      if (musicPlaying) { bgm.play().catch(() => {}); document.getElementById('music-toggle').textContent = 'Music ON'; }
+      else { bgm.pause(); document.getElementById('music-toggle').textContent = 'Music OFF'; }
     });
 
-    // === Character sprite pool (loaded dynamically per player) ===
-    const CHARACTER_SPRITES = ['Custom1', 'Boy', 'Cavegirl', 'Eskimo', 'FighterRed', 'Monk', 'OldMan', 'Princess', 'Samurai', 'Skeleton', 'Vampire', 'Villager'];
+    // === Character sprites ===
+    const CHARACTER_SPRITES = ['Custom1','Boy','Cavegirl','Eskimo','FighterRed','Monk','OldMan','Princess','Samurai','Skeleton','Vampire','Villager'];
     const characterImages = {};
     CHARACTER_SPRITES.forEach(name => {
       const img = new Image();
@@ -218,33 +227,17 @@
       characterImages[name] = img;
       totalImagesToLoad++;
     });
-    // Fallback default
     images['player'] = new Image();
     images['player'].src = 'assets/player.png';
-    images['player'].onload = () => {
-      imagesLoaded++;
-      PLAYER_W = images['player'].width / 4;
-      PLAYER_H = images['player'].height / 4;
-    };
+    images['player'].onload = () => { imagesLoaded++; PLAYER_W = images['player'].width / 4; PLAYER_H = images['player'].height / 4; };
 
-    // === Emote icons ===
     const emoteImages = {};
-    for (let i = 1; i <= 16; i++) {
-      const img = new Image();
-      img.src = `assets/emotes/emote${i}.png`;
-      emoteImages[i] = img;
-    }
+    for (let i = 1; i <= 16; i++) { const img = new Image(); img.src = `assets/emotes/emote${i}.png`; emoteImages[i] = img; }
 
-    // === Item icons (for interaction bubbles) ===
-    const ITEM_NAMES = ['Noodle', 'Sushi', 'Fish', 'Onigiri', 'Meat', 'FortuneCookie', 'Honey', 'LifePot', 'MilkPot', 'WaterPot', 'Heart', 'Sword', 'Katana', 'Bow', 'GoldCoin', 'GoldKey'];
+    const ITEM_NAMES = ['Noodle','Sushi','Fish','Onigiri','Meat','FortuneCookie','Honey','LifePot','MilkPot','WaterPot','Heart','Sword','Katana','Bow','GoldCoin','GoldKey'];
     const itemImages = {};
-    ITEM_NAMES.forEach(name => {
-      const img = new Image();
-      img.src = `assets/items/${name}.png`;
-      itemImages[name] = img;
-    });
+    ITEM_NAMES.forEach(name => { const img = new Image(); img.src = `assets/items/${name}.png`; itemImages[name] = img; });
 
-    // === Sound effects ===
     const sfx = {
       interact: new Audio('assets/sounds/interact.wav'),
       chat: new Audio('assets/sounds/chat.wav'),
@@ -253,53 +246,101 @@
     };
     Object.values(sfx).forEach(s => { s.volume = 0.25; });
 
-    // === NPC Animal sprites (2-frame animations, 16x16 each) ===
     const animalImages = {};
-    ['Cat', 'Dog', 'Frog'].forEach(name => {
-      const img = new Image();
-      img.src = `assets/animals/${name}.png`;
-      animalImages[name] = img;
-    });
+    ['Cat','Dog','Frog'].forEach(name => { const img = new Image(); img.src = `assets/animals/${name}.png`; animalImages[name] = img; });
 
-    // === Animated decoration sprites (4-frame, 16x16 each) ===
     const animDecorImages = {};
-    ['FlagRed', 'Flower', 'WaterRipple'].forEach(name => {
-      const img = new Image();
-      img.src = `assets/animated/${name}.png`;
-      animDecorImages[name] = img;
-    });
+    ['FlagRed','Flower','WaterRipple'].forEach(name => { const img = new Image(); img.src = `assets/animated/${name}.png`; animDecorImages[name] = img; });
 
-    // === Sprite-based particle images ===
     const particleSprites = {};
-    ['Leaf', 'LeafPink', 'Spark'].forEach(name => {
-      const img = new Image();
-      img.src = `assets/particles/${name}.png`;
-      particleSprites[name] = img;
-    });
+    ['Leaf','LeafPink','Spark'].forEach(name => { const img = new Image(); img.src = `assets/particles/${name}.png`; particleSprites[name] = img; });
 
-    // === NPC Animals state ===
-    let npcAnimals = [];
-    let npcAnimalsInitialized = false;
+    let npcAnimals = [], npcAnimalsInitialized = false;
+    let animDecors = [], animDecorsInitialized = false;
 
-    // === Animated decorations state ===
-    let animDecors = [];
-    let animDecorsInitialized = false;
-
-    // === Mouse events ===
+    // ==========================================
+    // === Mouse / Camera event handlers ===
+    // ==========================================
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      mouseX = (e.clientX - rect.left) * scaleX;
-      mouseY = (e.clientY - rect.top) * scaleY;
+      const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+      mouseScreenX = (e.clientX - rect.left) * scaleX;
+      mouseScreenY = (e.clientY - rect.top) * scaleY;
+      mouseX = mouseScreenX / camera.zoom + camera.x;
+      mouseY = mouseScreenY / camera.zoom + camera.y;
+      if (isDragging) {
+        dragMoved = true;
+        const dx = (mouseScreenX - dragStartScreen.x) / camera.zoom;
+        const dy = (mouseScreenY - dragStartScreen.y) / camera.zoom;
+        camera.x = camera.targetX = dragStartCam.x - dx;
+        camera.y = camera.targetY = dragStartCam.y - dy;
+      }
     });
-    canvas.addEventListener('mouseleave', () => { mouseX = -1; mouseY = -1; });
+    canvas.addEventListener('mouseleave', () => { mouseScreenX = -1; mouseScreenY = -1; mouseX = -1; mouseY = -1; });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isDragging = true; dragMoved = false;
+      dragStartScreen = { x: mouseScreenX, y: mouseScreenY };
+      dragStartCam = { x: camera.x, y: camera.y };
+      canvas.classList.add('dragging');
+    });
+    canvas.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+      canvas.classList.remove('dragging');
+      if (!dragMoved) {
+        if (hoveredPlayerId && clientPlayers[hoveredPlayerId]) {
+          selectAndFollowPlayer(hoveredPlayerId);
+        } else {
+          isCameraFollowing = false;
+        }
+      } else {
+        isCameraFollowing = false;
+      }
+      isDragging = false;
+    });
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.25 : 0.25;
+      camera.targetZoom = Math.max(1.0, Math.min(4.0, camera.targetZoom + delta));
+      if (mouseScreenX >= 0) {
+        const nz = camera.targetZoom;
+        camera.x = camera.targetX = mouseX - mouseScreenX / nz;
+        camera.y = camera.targetY = mouseY - mouseScreenY / nz;
+      }
+      isCameraFollowing = false;
+    }, { passive: false });
+
+    miniCanvas.addEventListener('click', (e) => {
+      if (!mapData) return;
+      const rect = miniCanvas.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (miniCanvas.width / rect.width);
+      const my = (e.clientY - rect.top) * (miniCanvas.height / rect.height);
+      const mapPixelW = mapData.width * TILE_SIZE, mapPixelH = mapData.height * TILE_SIZE;
+      const scale = Math.min(miniCanvas.width / mapPixelW, miniCanvas.height / mapPixelH);
+      camera.targetX = mx / scale - VIEWPORT_W / (2 * camera.zoom);
+      camera.targetY = my / scale - VIEWPORT_H / (2 * camera.zoom);
+      isCameraFollowing = false;
+    });
+
+    function selectAndFollowPlayer(id) {
+      selectedPlayerId = id;
+      isCameraFollowing = true;
+      selectedFlashTime = Date.now();
+      activityDetailEl.classList.add('visible');
+      const p = clientPlayers[id];
+      if (p) { activityDetailNameEl.textContent = p.name; renderActivityLog(id); }
+      updateAiPanel();
+    }
+
+    // ==========================================
     // === initialize() ===
+    // ==========================================
     async function initialize() {
       try {
         const response = await fetch('assets/map.tmj');
         mapData = await response.json();
-
         if (mapData.tilesets) {
           totalImagesToLoad += mapData.tilesets.length;
           mapData.tilesets.forEach(ts => {
@@ -309,20 +350,21 @@
             images[imgName].onload = () => { imagesLoaded++; };
           });
         }
-        canvas.width = mapData.width * TILE_SIZE;
-        canvas.height = mapData.height * TILE_SIZE;
+        // Fixed viewport
+        canvas.width = VIEWPORT_W; canvas.height = VIEWPORT_H;
+        // Center camera
+        const mapPixelW = mapData.width * TILE_SIZE, mapPixelH = mapData.height * TILE_SIZE;
+        camera.x = camera.targetX = mapPixelW / 2 - VIEWPORT_W / (2 * camera.zoom);
+        camera.y = camera.targetY = mapPixelH / 2 - VIEWPORT_H / (2 * camera.zoom);
 
-        // SSE connection
         const eventSource = new EventSource('/events');
-        eventSource.onopen = () => {
-          document.getElementById('status-text').innerText = "Connected - Let your OpenClaw or ClaudeCode Join the World!";
-        };
+        eventSource.onopen = () => { document.getElementById('status-text').innerText = "Connected - Let your OpenClaw or ClaudeCode Join the World!"; };
         eventSource.onmessage = (event) => {
           const serverPlayers = JSON.parse(event.data);
           for (const id in serverPlayers) {
             const sp = serverPlayers[id];
             if (!clientPlayers[id]) {
-              clientPlayers[id] = { ...sp, displayX: sp.x * TILE_SIZE, displayY: sp.y * TILE_SIZE, targetX: sp.x * TILE_SIZE, targetY: sp.y * TILE_SIZE, animFrame: 0, id: id };
+              clientPlayers[id] = { ...sp, displayX: sp.x * TILE_SIZE, displayY: sp.y * TILE_SIZE, targetX: sp.x * TILE_SIZE, targetY: sp.y * TILE_SIZE, animFrame: 0, id };
             } else {
               clientPlayers[id].targetX = sp.x * TILE_SIZE;
               clientPlayers[id].targetY = sp.y * TILE_SIZE;
@@ -335,86 +377,91 @@
               clientPlayers[id].id = id;
               clientPlayers[id].isThinking = sp.isThinking;
               clientPlayers[id].currentZoneName = sp.currentZoneName;
-
-              // Play sound when interaction starts
               if (sp.interactionSound && !clientPlayers[id]._lastSound) {
                 clientPlayers[id]._lastSound = sp.interactionSound;
                 if (sfx[sp.interactionSound]) sfx[sp.interactionSound].cloneNode().play().catch(() => {});
               }
               if (!sp.interactionSound) clientPlayers[id]._lastSound = null;
             }
+            // Record trail
+            if (!playerTrails[id]) playerTrails[id] = [];
+            const trail = playerTrails[id];
+            const wx = sp.x * TILE_SIZE + TILE_SIZE / 2, wy = sp.y * TILE_SIZE + TILE_SIZE / 2;
+            const last = trail[trail.length - 1];
+            if (!last || last.wx !== wx || last.wy !== wy) {
+              trail.push({ wx, wy, time: Date.now() });
+              if (trail.length > MAX_TRAIL) trail.shift();
+            }
           }
           for (const id in clientPlayers) {
-            if (!serverPlayers[id]) { delete clientPlayers[id]; delete playerActivityData[id]; }
+            if (!serverPlayers[id]) { delete clientPlayers[id]; delete playerActivityData[id]; delete playerTrails[id]; }
           }
           updateAiPanel();
         };
-        // Chat history (initial batch)
-        eventSource.addEventListener('chatHistory', (event) => {
-          const history = JSON.parse(event.data);
-          history.forEach(entry => addChatMessage(entry.name, entry.message, entry.time));
-        });
-        // Live chat messages
-        eventSource.addEventListener('chat', (event) => {
-          const entry = JSON.parse(event.data);
-          addChatMessage(entry.name, entry.message, entry.time);
-          sfx.chat.cloneNode().play().catch(() => {});
-        });
-        // Interaction events
-        eventSource.addEventListener('interaction', (event) => {
-          const entry = JSON.parse(event.data);
-          addInteractionMessage(entry);
-        });
-        // Activity events (for AI panel)
-        eventSource.addEventListener('activity', (event) => {
-          const data = JSON.parse(event.data);
+        eventSource.addEventListener('chatHistory', (e) => { JSON.parse(e.data).forEach(entry => addChatMessage(entry.name, entry.message, entry.time)); });
+        eventSource.addEventListener('chat', (e) => { const entry = JSON.parse(e.data); addChatMessage(entry.name, entry.message, entry.time); sfx.chat.cloneNode().play().catch(() => {}); });
+        eventSource.addEventListener('interaction', (e) => { addInteractionMessage(JSON.parse(e.data)); });
+        eventSource.addEventListener('activity', (e) => {
+          const data = JSON.parse(e.data);
           playerActivityData[data.id] = data.activities || [];
-          if (selectedPlayerId === data.id) {
-            renderActivityLog(data.id);
-          }
+          if (selectedPlayerId === data.id) renderActivityLog(data.id);
         });
-        eventSource.onerror = () => {
-          document.getElementById('status-text').innerText = "Disconnected - Reconnecting...";
-        };
+        eventSource.onerror = () => { document.getElementById('status-text').innerText = "Disconnected - Reconnecting..."; };
 
-        // Initialize particles
-        initParticles();
-        // Initialize NPC animals and decorations (after map loads)
-        initNpcAnimals();
-        initAnimDecors();
-
-        if (!isGameLoopRunning) {
-          isGameLoopRunning = true;
-          lastFrameTime = performance.now();
-          requestAnimationFrame(gameLoop);
-        }
+        initParticles(); initNpcAnimals(); initAnimDecors();
+        if (!isGameLoopRunning) { isGameLoopRunning = true; lastFrameTime = performance.now(); requestAnimationFrame(gameLoop); }
       } catch (error) {
         document.getElementById('status-text').innerText = "Failed to load map!";
         console.error("Load error:", error);
       }
     }
 
-    // === gameLoop() ===
+    // ==========================================
+    // === Game loop ===
+    // ==========================================
     let lastFrameTime = 0;
     function gameLoop(timestamp) {
-      const dt = (timestamp - lastFrameTime) / 1000; // delta in seconds
+      const dt = (timestamp - lastFrameTime) / 1000;
       lastFrameTime = timestamp;
-
       if (mapData && imagesLoaded >= totalImagesToLoad) {
         updateDayNight(dt);
         updateParticles(dt);
         updateNpcAnimals(dt);
         updatePhysics();
+        updateCamera(dt);
         draw();
         drawMinimap();
       }
       requestAnimationFrame(gameLoop);
     }
 
+    // ==========================================
+    // === updateCamera() ===
+    // ==========================================
+    function updateCamera(dt) {
+      camera.zoom += (camera.targetZoom - camera.zoom) * Math.min(1, dt * 10);
+      if (isCameraFollowing && selectedPlayerId && clientPlayers[selectedPlayerId]) {
+        const p = clientPlayers[selectedPlayerId];
+        camera.targetX = p.displayX + TILE_SIZE / 2 - VIEWPORT_W / (2 * camera.zoom);
+        camera.targetY = p.displayY + TILE_SIZE / 2 - VIEWPORT_H / (2 * camera.zoom);
+      }
+      if (mapData) {
+        const maxX = mapData.width * TILE_SIZE - VIEWPORT_W / camera.zoom;
+        const maxY = mapData.height * TILE_SIZE - VIEWPORT_H / camera.zoom;
+        camera.targetX = Math.max(0, Math.min(camera.targetX, maxX));
+        camera.targetY = Math.max(0, Math.min(camera.targetY, maxY));
+      }
+      if (!isDragging) {
+        camera.x += (camera.targetX - camera.x) * Math.min(1, dt * 8);
+        camera.y += (camera.targetY - camera.y) * Math.min(1, dt * 8);
+      }
+    }
+
+    // ==========================================
     // === updatePhysics() ===
+    // ==========================================
     function updatePhysics() {
-      const MOVE_SPEED = 2;
-      const ANIM_SPEED = 0.15;
+      const MOVE_SPEED = 2, ANIM_SPEED = 0.15;
       for (const id in clientPlayers) {
         const p = clientPlayers[id];
         let isMoving = false;
@@ -426,755 +473,529 @@
         else { p.animFrame = 0; }
       }
     }
-    // === Day/night cycle ===
+
+    // ==========================================
+    // === Day/night ===
+    // ==========================================
     function updateDayNight(dt) {
-      gameTime += TIME_SPEED * dt * 60; // advance game time
-      if (gameTime >= 1440) gameTime -= 1440; // wrap at midnight
-
-      const hours = Math.floor(gameTime / 60);
-      const mins = Math.floor(gameTime % 60);
-      document.getElementById('time-display').textContent =
-        `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+      gameTime += TIME_SPEED * dt * 60;
+      if (gameTime >= 1440) gameTime -= 1440;
+      const hours = Math.floor(gameTime / 60), mins = Math.floor(gameTime % 60);
+      document.getElementById('time-display').textContent = `${String(hours).padStart(2,'0')}:${String(mins).padStart(2,'0')}`;
     }
-
     function getDayNightOverlay() {
-      // Returns {color, alpha} for the time-of-day tint
-      const h = gameTime / 60; // hour as float
-      if (h >= 6 && h < 8) {
-        // Dawn: orange tint fading out
-        const t = (h - 6) / 2;
-        return { r: 255, g: 180, b: 100, a: 0.15 * (1 - t) };
-      } else if (h >= 8 && h < 17) {
-        // Daytime: no overlay
-        return { r: 0, g: 0, b: 0, a: 0 };
-      } else if (h >= 17 && h < 19) {
-        // Sunset: warm orange
-        const t = (h - 17) / 2;
-        return { r: 255, g: 140, b: 50, a: 0.12 * t };
-      } else if (h >= 19 && h < 21) {
-        // Dusk: darkening blue
-        const t = (h - 19) / 2;
-        return { r: 20, g: 20, b: 80, a: 0.12 + 0.25 * t };
-      } else if (h >= 21 || h < 4) {
-        // Night: deep blue
-        return { r: 10, g: 10, b: 50, a: 0.4 };
-      } else {
-        // Pre-dawn (4-6): gradually lightening
-        const t = (h - 4) / 2;
-        return { r: 30, g: 20, b: 80, a: 0.4 * (1 - t) };
-      }
+      const h = gameTime / 60;
+      if (h >= 6 && h < 8)  return { r:255,g:180,b:100, a: 0.15 * (1-(h-6)/2) };
+      if (h >= 8 && h < 17) return { r:0,g:0,b:0, a:0 };
+      if (h >= 17 && h < 19) return { r:255,g:140,b:50, a: 0.12 * (h-17)/2 };
+      if (h >= 19 && h < 21) return { r:20,g:20,b:80, a: 0.12 + 0.25*(h-19)/2 };
+      if (h >= 21 || h < 4)  return { r:10,g:10,b:50, a:0.4 };
+      return { r:30,g:20,b:80, a: 0.4*(1-(h-4)/2) };
     }
+    function isNight() { return gameTime >= 1260 || gameTime < 300; }
 
-    function isNight() { return gameTime >= 1260 || gameTime < 300; } // 9pm to 5am
-
+    // ==========================================
     // === Particle system ===
-    function initParticles() {
-      particles = [];
-      // We'll spawn particles dynamically in updateParticles
-    }
-
+    // ==========================================
+    function initParticles() { particles = []; }
     function spawnFirefly() {
       if (!mapData) return;
-      const cw = mapData.width * TILE_SIZE;
-      const ch = mapData.height * TILE_SIZE;
-      particles.push({
-        type: 'firefly',
-        x: Math.random() * cw,
-        y: Math.random() * ch,
-        vx: (Math.random() - 0.5) * 15,
-        vy: (Math.random() - 0.5) * 10,
-        life: 4 + Math.random() * 6,
-        maxLife: 10,
-        phase: Math.random() * Math.PI * 2,
-        size: 1.5 + Math.random() * 1.5,
-      });
+      particles.push({ type:'firefly', x:Math.random()*mapData.width*TILE_SIZE, y:Math.random()*mapData.height*TILE_SIZE,
+        vx:(Math.random()-0.5)*15, vy:(Math.random()-0.5)*10, life:4+Math.random()*6, maxLife:10,
+        phase:Math.random()*Math.PI*2, size:1.5+Math.random()*1.5 });
     }
-
-    function spawnLeaf(zoneX, zoneY, zoneW, zoneH) {
-      const scaleX = TILE_SIZE / mapData.tilewidth;
-      const scaleY = TILE_SIZE / mapData.tileheight;
-      particles.push({
-        type: 'leaf',
-        x: zoneX * scaleX + Math.random() * zoneW * scaleX,
-        y: zoneY * scaleY - 10,
-        vx: 8 + Math.random() * 12,
-        vy: 15 + Math.random() * 10,
-        life: 3 + Math.random() * 2,
-        maxLife: 5,
-        rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 4,
-        size: 2 + Math.random() * 2,
-      });
+    function spawnLeaf(zx,zy,zw,zh) {
+      const sx=TILE_SIZE/mapData.tilewidth, sy=TILE_SIZE/mapData.tileheight;
+      particles.push({ type:'leaf', x:zx*sx+Math.random()*zw*sx, y:zy*sy-10, vx:8+Math.random()*12, vy:15+Math.random()*10,
+        life:3+Math.random()*2, maxLife:5, rot:Math.random()*Math.PI*2, rotSpeed:(Math.random()-0.5)*4, size:2+Math.random()*2 });
     }
-
-    function spawnWaterShimmer(zoneX, zoneY, zoneW, zoneH) {
-      const scaleX = TILE_SIZE / mapData.tilewidth;
-      const scaleY = TILE_SIZE / mapData.tileheight;
-      const w = Math.max(zoneW * scaleX, 20);
-      const h = Math.max(zoneH * scaleY, 20);
-      particles.push({
-        type: 'shimmer',
-        x: zoneX * scaleX + Math.random() * w,
-        y: zoneY * scaleY + Math.random() * h,
-        life: 0.8 + Math.random() * 1.2,
-        maxLife: 2,
-        size: 1 + Math.random() * 2,
-      });
+    function spawnWaterShimmer(zx,zy,zw,zh) {
+      const sx=TILE_SIZE/mapData.tilewidth, sy=TILE_SIZE/mapData.tileheight;
+      particles.push({ type:'shimmer', x:zx*sx+Math.random()*Math.max(zw*sx,20), y:zy*sy+Math.random()*Math.max(zh*sy,20),
+        life:0.8+Math.random()*1.2, maxLife:2, size:1+Math.random()*2 });
     }
-
     let particleTimer = 0;
     function updateParticles(dt) {
       particleTimer += dt;
-
-      // Spawn fireflies at night
       if (isNight() && particleTimer > 0.3) {
         particleTimer = 0;
-        if (particles.filter(p => p.type === 'firefly').length < 25) {
-          spawnFirefly();
-        }
+        if (particles.filter(p=>p.type==='firefly').length < 25) spawnFirefly();
       }
-
-      // Spawn leaves near trees and shimmer near water (less frequently)
       if (mapData && Math.random() < dt * 0.5) {
-        const zoneLayer = mapData.layers.find(l => l.name === 'SemanticZones' || l.type === 'objectgroup');
-        if (zoneLayer && zoneLayer.objects) {
-          zoneLayer.objects.forEach(zone => {
-            const name = (zone.name || '').toLowerCase();
-            if (name.includes('tree') && Math.random() < 0.05) {
-              spawnLeaf(zone.x, zone.y, zone.width || 30, zone.height || 30);
-            }
-            if (name.includes('pond') && Math.random() < 0.08) {
-              spawnWaterShimmer(zone.x, zone.y, zone.width || 20, zone.height || 30);
-            }
-          });
-        }
+        const zl = mapData.layers.find(l=>l.type==='objectgroup');
+        if (zl && zl.objects) zl.objects.forEach(z => {
+          const n=(z.name||'').toLowerCase();
+          if (n.includes('tree') && Math.random()<0.05) spawnLeaf(z.x,z.y,z.width||30,z.height||30);
+          if (n.includes('pond') && Math.random()<0.08) spawnWaterShimmer(z.x,z.y,z.width||20,z.height||30);
+        });
       }
-
-      // Update existing particles
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.life -= dt;
-        if (p.life <= 0) { particles.splice(i, 1); continue; }
-
-        if (p.type === 'firefly') {
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          // Gentle direction changes
-          p.vx += (Math.random() - 0.5) * 20 * dt;
-          p.vy += (Math.random() - 0.5) * 15 * dt;
-          p.vx = Math.max(-20, Math.min(20, p.vx));
-          p.vy = Math.max(-15, Math.min(15, p.vy));
-        } else if (p.type === 'leaf') {
-          p.x += p.vx * dt;
-          p.y += p.vy * dt;
-          p.rot += p.rotSpeed * dt;
-        }
-        // shimmer stays still, just fades
+      for (let i=particles.length-1;i>=0;i--) {
+        const p=particles[i]; p.life-=dt;
+        if (p.life<=0){particles.splice(i,1);continue;}
+        if (p.type==='firefly'){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx+=(Math.random()-0.5)*20*dt;p.vy+=(Math.random()-0.5)*15*dt;p.vx=Math.max(-20,Math.min(20,p.vx));p.vy=Math.max(-15,Math.min(15,p.vy));}
+        else if (p.type==='leaf'){p.x+=p.vx*dt;p.y+=p.vy*dt;p.rot+=p.rotSpeed*dt;}
       }
     }
 
-    // === NPC Animal System ===
+    // ==========================================
+    // === NPC Animals ===
+    // ==========================================
     function initNpcAnimals() {
-      if (!mapData || npcAnimalsInitialized) return;
-      npcAnimalsInitialized = true;
-      const zoneLayer = mapData.layers.find(l => l.name === 'SemanticZones' || l.type === 'objectgroup');
-      if (!zoneLayer || !zoneLayer.objects) return;
-      const scaleX = TILE_SIZE / mapData.tilewidth;
-      const scaleY = TILE_SIZE / mapData.tileheight;
-
-      zoneLayer.objects.forEach(zone => {
-        const name = (zone.name || '').toLowerCase();
-        const zx = zone.x * scaleX, zy = zone.y * scaleY;
-        const zw = (zone.width || 30) * scaleX, zh = (zone.height || 30) * scaleY;
-
-        // Spawn cats near buildings
-        if (name.includes('inn') || name.includes('noodle') || name.includes('warehouse')) {
-          npcAnimals.push(createAnimal('Cat', zx, zy, zw, zh));
-        }
-        // Spawn dogs near practice grounds
-        if (name.includes('practice') || name.includes('weapon')) {
-          npcAnimals.push(createAnimal('Dog', zx, zy, zw, zh));
-        }
-        // Spawn frogs near ponds
-        if (name.includes('pond')) {
-          npcAnimals.push(createAnimal('Frog', zx, zy, zw, zh));
-          npcAnimals.push(createAnimal('Frog', zx, zy, zw, zh));
-        }
+      if (!mapData||npcAnimalsInitialized) return; npcAnimalsInitialized=true;
+      const zl=mapData.layers.find(l=>l.type==='objectgroup');
+      if (!zl||!zl.objects) return;
+      const sx=TILE_SIZE/mapData.tilewidth, sy=TILE_SIZE/mapData.tileheight;
+      zl.objects.forEach(z=>{
+        const n=(z.name||'').toLowerCase(), zx=z.x*sx,zy=z.y*sy,zw=(z.width||30)*sx,zh=(z.height||30)*sy;
+        if (n.includes('inn')||n.includes('noodle')||n.includes('warehouse')) npcAnimals.push(createAnimal('Cat',zx,zy,zw,zh));
+        if (n.includes('practice')||n.includes('weapon')) npcAnimals.push(createAnimal('Dog',zx,zy,zw,zh));
+        if (n.includes('pond')){ npcAnimals.push(createAnimal('Frog',zx,zy,zw,zh)); npcAnimals.push(createAnimal('Frog',zx,zy,zw,zh)); }
       });
     }
-
-    function createAnimal(type, zx, zy, zw, zh) {
-      return {
-        type, zx, zy, zw, zh,
-        x: zx + Math.random() * zw,
-        y: zy + Math.random() * zh,
-        vx: 0, vy: 0,
-        animFrame: 0,
-        animTimer: 0,
-        moveTimer: Math.random() * 3,
-        idleTime: 2 + Math.random() * 4,
-        facing: Math.random() > 0.5 ? 1 : -1, // 1=right, -1=left
-      };
+    function createAnimal(type,zx,zy,zw,zh){
+      return {type,zx,zy,zw,zh,x:zx+Math.random()*zw,y:zy+Math.random()*zh,vx:0,vy:0,animFrame:0,animTimer:0,moveTimer:Math.random()*3,idleTime:2+Math.random()*4,facing:Math.random()>0.5?1:-1};
     }
-
-    function updateNpcAnimals(dt) {
-      for (const a of npcAnimals) {
-        a.animTimer += dt;
-        if (a.animTimer > 0.4) { a.animTimer = 0; a.animFrame = (a.animFrame + 1) % 2; }
-
-        a.moveTimer -= dt;
-        if (a.moveTimer <= 0) {
-          // Pick new random direction within zone bounds
-          if (Math.random() < 0.6) {
-            const speed = 6 + Math.random() * 8;
-            const angle = Math.random() * Math.PI * 2;
-            a.vx = Math.cos(angle) * speed;
-            a.vy = Math.sin(angle) * speed * 0.5;
-            a.facing = a.vx >= 0 ? 1 : -1;
-            a.moveTimer = 0.5 + Math.random() * 1.5;
-          } else {
-            a.vx = 0; a.vy = 0;
-            a.moveTimer = a.idleTime + Math.random() * 3;
-          }
+    function updateNpcAnimals(dt){
+      for (const a of npcAnimals){
+        a.animTimer+=dt; if(a.animTimer>0.4){a.animTimer=0;a.animFrame=(a.animFrame+1)%2;}
+        a.moveTimer-=dt;
+        if(a.moveTimer<=0){
+          if(Math.random()<0.6){const speed=6+Math.random()*8,angle=Math.random()*Math.PI*2;a.vx=Math.cos(angle)*speed;a.vy=Math.sin(angle)*speed*0.5;a.facing=a.vx>=0?1:-1;a.moveTimer=0.5+Math.random()*1.5;}
+          else{a.vx=0;a.vy=0;a.moveTimer=a.idleTime+Math.random()*3;}
         }
-
-        a.x += a.vx * dt;
-        a.y += a.vy * dt;
-        // Clamp to zone bounds
-        a.x = Math.max(a.zx, Math.min(a.x, a.zx + a.zw - 8));
-        a.y = Math.max(a.zy, Math.min(a.y, a.zy + a.zh - 8));
+        a.x+=a.vx*dt; a.y+=a.vy*dt;
+        a.x=Math.max(a.zx,Math.min(a.x,a.zx+a.zw-8));
+        a.y=Math.max(a.zy,Math.min(a.y,a.zy+a.zh-8));
+      }
+    }
+    function drawNpcAnimals(){
+      for (const a of npcAnimals){
+        const img=animalImages[a.type]; if(!img||!img.complete) continue;
+        const fw=img.width/2,fh=img.height;
+        ctx.save(); ctx.imageSmoothingEnabled=false;
+        if(a.facing<0){ctx.translate(a.x+TILE_SIZE*0.6,a.y);ctx.scale(-1,1);ctx.drawImage(img,a.animFrame*fw,0,fw,fh,0,0,TILE_SIZE*0.6,TILE_SIZE*0.6);}
+        else{ctx.drawImage(img,a.animFrame*fw,0,fw,fh,a.x,a.y,TILE_SIZE*0.6,TILE_SIZE*0.6);}
+        ctx.imageSmoothingEnabled=true; ctx.restore();
       }
     }
 
-    function drawNpcAnimals() {
-      for (const a of npcAnimals) {
-        const img = animalImages[a.type];
-        if (!img || !img.complete) continue;
-        const frameW = img.width / 2; // 2 frames
-        const frameH = img.height;
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        if (a.facing < 0) {
-          // Flip horizontally
-          ctx.translate(a.x + TILE_SIZE * 0.6, a.y);
-          ctx.scale(-1, 1);
-          ctx.drawImage(img, a.animFrame * frameW, 0, frameW, frameH, 0, 0, TILE_SIZE * 0.6, TILE_SIZE * 0.6);
-        } else {
-          ctx.drawImage(img, a.animFrame * frameW, 0, frameW, frameH, a.x, a.y, TILE_SIZE * 0.6, TILE_SIZE * 0.6);
-        }
-        ctx.imageSmoothingEnabled = true;
-        ctx.restore();
-      }
-    }
-
-    // === Animated Decoration System ===
-    function initAnimDecors() {
-      if (!mapData || animDecorsInitialized) return;
-      animDecorsInitialized = true;
-      const zoneLayer = mapData.layers.find(l => l.name === 'SemanticZones' || l.type === 'objectgroup');
-      if (!zoneLayer || !zoneLayer.objects) return;
-      const scaleX = TILE_SIZE / mapData.tilewidth;
-      const scaleY = TILE_SIZE / mapData.tileheight;
-
-      zoneLayer.objects.forEach(zone => {
-        const name = (zone.name || '').toLowerCase();
-        const zx = zone.x * scaleX, zy = zone.y * scaleY;
-        const zw = (zone.width || 30) * scaleX, zh = (zone.height || 30) * scaleY;
-
-        // Place flowers near grassland and tree zones
-        if (name.includes('grass') || name.includes('tree')) {
-          const count = 2 + Math.floor(Math.random() * 3);
-          for (let i = 0; i < count; i++) {
-            animDecors.push({
-              type: 'Flower',
-              x: zx + Math.random() * zw,
-              y: zy + Math.random() * zh,
-              frame: Math.floor(Math.random() * 4),
-              speed: 0.12 + Math.random() * 0.08,
-              timer: Math.random() * 4,
-            });
-          }
-        }
-
-        // Place water ripples on pond surfaces
-        if (name.includes('pond')) {
-          const count = 3 + Math.floor(Math.random() * 3);
-          for (let i = 0; i < count; i++) {
-            animDecors.push({
-              type: 'WaterRipple',
-              x: zx + Math.random() * zw,
-              y: zy + Math.random() * zh,
-              frame: Math.floor(Math.random() * 4),
-              speed: 0.2 + Math.random() * 0.1,
-              timer: Math.random() * 4,
-            });
-          }
-        }
-
-        // Place flags near buildings (entrance area)
-        if (name.includes('noodle') || name.includes('inn') || name.includes('weapon') || name.includes('potion')) {
-          animDecors.push({
-            type: 'FlagRed',
-            x: zx - 4,
-            y: zy - 8,
-            frame: 0,
-            speed: 0.15,
-            timer: Math.random() * 4,
-          });
-        }
+    // ==========================================
+    // === Animated decorations ===
+    // ==========================================
+    function initAnimDecors(){
+      if(!mapData||animDecorsInitialized) return; animDecorsInitialized=true;
+      const zl=mapData.layers.find(l=>l.type==='objectgroup');
+      if(!zl||!zl.objects) return;
+      const sx=TILE_SIZE/mapData.tilewidth,sy=TILE_SIZE/mapData.tileheight;
+      zl.objects.forEach(z=>{
+        const n=(z.name||'').toLowerCase(),zx=z.x*sx,zy=z.y*sy,zw=(z.width||30)*sx,zh=(z.height||30)*sy;
+        if(n.includes('grass')||n.includes('tree')){const c=2+Math.floor(Math.random()*3);for(let i=0;i<c;i++) animDecors.push({type:'Flower',x:zx+Math.random()*zw,y:zy+Math.random()*zh,speed:0.12+Math.random()*0.08,timer:Math.random()*4});}
+        if(n.includes('pond')){const c=3+Math.floor(Math.random()*3);for(let i=0;i<c;i++) animDecors.push({type:'WaterRipple',x:zx+Math.random()*zw,y:zy+Math.random()*zh,speed:0.2+Math.random()*0.1,timer:Math.random()*4});}
+        if(n.includes('noodle')||n.includes('inn')||n.includes('weapon')||n.includes('potion')) animDecors.push({type:'FlagRed',x:zx-4,y:zy-8,speed:0.15,timer:Math.random()*4});
       });
     }
-
-    function drawAnimDecors(layerName) {
-      // layerName: 'bottom' for water/flowers, 'top' for flags
-      const now = Date.now() / 1000;
-      for (const d of animDecors) {
-        const img = animDecorImages[d.type];
-        if (!img || !img.complete) continue;
-
-        const isBottom = (d.type === 'WaterRipple' || d.type === 'Flower');
-        if ((layerName === 'bottom' && !isBottom) || (layerName === 'top' && isBottom)) continue;
-
-        const frameW = img.width / 4; // 4 frames
-        const frameH = img.height;
-        const frame = Math.floor((now * (1 / d.speed)) + d.timer) % 4;
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(img, frame * frameW, 0, frameW, frameH, d.x, d.y, TILE_SIZE * 0.7, TILE_SIZE * 0.7);
-        ctx.imageSmoothingEnabled = true;
+    function drawAnimDecors(layerName){
+      const now=Date.now()/1000;
+      for(const d of animDecors){
+        const img=animDecorImages[d.type]; if(!img||!img.complete) continue;
+        const isBottom=(d.type==='WaterRipple'||d.type==='Flower');
+        if((layerName==='bottom'&&!isBottom)||(layerName==='top'&&isBottom)) continue;
+        const fw=img.width/4,fh=img.height,frame=Math.floor((now*(1/d.speed))+d.timer)%4;
+        ctx.imageSmoothingEnabled=false;
+        ctx.drawImage(img,frame*fw,0,fw,fh,d.x,d.y,TILE_SIZE*0.7,TILE_SIZE*0.7);
+        ctx.imageSmoothingEnabled=true;
       }
     }
 
+    // ==========================================
     // === drawTile() ===
-    function drawTile(gid, x, y) {
-      if (gid === 0) return;
-      const ts = mapData.tilesets.slice().reverse().find(t => gid >= t.firstgid);
-      if (!ts) return;
-      const imgName = ts.image.split('/').pop();
-      if (!images[imgName]) return;
-      const localId = gid - ts.firstgid;
-      const columns = ts.columns;
-      const sx = (localId % columns) * ts.tilewidth;
-      const sy = Math.floor(localId / columns) * ts.tileheight;
-      ctx.drawImage(images[imgName], sx, sy, ts.tilewidth, ts.tileheight, x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+    // ==========================================
+    function drawTile(gid,x,y){
+      if(gid===0) return;
+      const ts=mapData.tilesets.slice().reverse().find(t=>gid>=t.firstgid);
+      if(!ts) return;
+      const imgName=ts.image.split('/').pop();
+      if(!images[imgName]) return;
+      const localId=gid-ts.firstgid,cols=ts.columns;
+      ctx.drawImage(images[imgName],(localId%cols)*ts.tilewidth,Math.floor(localId/cols)*ts.tileheight,ts.tilewidth,ts.tileheight,x*TILE_SIZE,y*TILE_SIZE,TILE_SIZE,TILE_SIZE);
     }
 
-    // === draw() - Main render function ===
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // 1. Bottom layers
-      const bottomLayers = ["BaseFloor", "Floor", "BaseNature"];
-      mapData.layers.forEach(layer => {
-        if (layer.type === 'tilelayer' && bottomLayers.includes(layer.name) && layer.visible) {
-          for (let i = 0; i < layer.data.length; i++) {
-            drawTile(layer.data[i], i % mapData.width, Math.floor(i / mapData.width));
-          }
+    // ==========================================
+    // === drawPlayerTrails() ===
+    // ==========================================
+    function drawPlayerTrails(){
+      const now=Date.now();
+      for(const id in playerTrails){
+        if(!clientPlayers[id]||clientPlayers[id].name==='Observer') continue;
+        const trail=playerTrails[id];
+        if(trail.length<2) continue;
+        for(let i=1;i<trail.length;i++){
+          const ageRatio=i/trail.length;
+          const timeFade=Math.max(0,1-(now-trail[i].time)/8000);
+          const alpha=ageRatio*timeFade*0.55;
+          if(alpha<0.01) continue;
+          ctx.beginPath();
+          ctx.moveTo(trail[i-1].wx,trail[i-1].wy);
+          ctx.lineTo(trail[i].wx,trail[i].wy);
+          ctx.strokeStyle=`rgba(116,185,255,${alpha})`;
+          ctx.lineWidth=Math.max(0.5,2/camera.zoom);
+          ctx.lineCap='round';
+          ctx.stroke();
         }
+      }
+    }
+
+    // ==========================================
+    // === drawPlayerHoverCard() — screen space ===
+    // ==========================================
+    function drawPlayerHoverCard(p, sx, sy){
+      const W=185,H=82;
+      let cx=sx+18, cy=sy-H-12;
+      if(cx+W>VIEWPORT_W) cx=sx-W-12;
+      if(cy<0) cy=sy+28;
+      ctx.fillStyle='rgba(20,20,40,0.95)';
+      ctx.beginPath(); ctx.roundRect(cx,cy,W,H,10); ctx.fill();
+      ctx.strokeStyle='#74b9ff'; ctx.lineWidth=1.5; ctx.stroke();
+      // Avatar
+      const si=(p.sprite&&characterImages[p.sprite])?characterImages[p.sprite]:images['player'];
+      if(si&&si.complete){const pw=si.width/4,ph=si.height/4;ctx.imageSmoothingEnabled=false;ctx.drawImage(si,0,0,pw,ph,cx+8,cy+8,32,32);ctx.imageSmoothingEnabled=true;}
+      // Name
+      ctx.font='bold 13px "Pixelify Sans",sans-serif';
+      ctx.fillStyle='#74b9ff'; ctx.textAlign='left'; ctx.textBaseline='top';
+      ctx.fillText(p.name,cx+46,cy+8);
+      // Zone
+      const zone=(p.currentZoneName||'小镇街道').split('(')[0].trim();
+      ctx.font='11px "Pixelify Sans",sans-serif'; ctx.fillStyle='#9aa899';
+      ctx.fillText('📍 '+zone,cx+46,cy+26);
+      // Status
+      ctx.fillStyle=p.isThinking?'#fdcb6e':'#00b894';
+      ctx.fillText(p.isThinking?'💭 Thinking...':'💤 Idle',cx+46,cy+42);
+      // Message
+      if(p.message){const msg=p.message.length>24?p.message.substring(0,24)+'…':p.message;ctx.fillStyle='#dfe6e9';ctx.fillText('💬 '+msg,cx+8,cy+60);}
+      // Click hint
+      ctx.font='10px "Pixelify Sans",sans-serif'; ctx.fillStyle='rgba(116,185,255,0.5)';
+      ctx.textAlign='right'; ctx.fillText('点击跟随',cx+W-6,cy+H-8);
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+    }
+
+    // ==========================================
+    // === draw() — main render ===
+    // ==========================================
+    function draw(){
+      ctx.clearRect(0,0,VIEWPORT_W,VIEWPORT_H);
+
+      // Apply camera transform (world space)
+      ctx.save();
+      ctx.imageSmoothingEnabled=false;
+      ctx.setTransform(camera.zoom,0,0,camera.zoom,-camera.x*camera.zoom,-camera.y*camera.zoom);
+
+      // 1. Bottom tile layers
+      ['BaseFloor','Floor','BaseNature'].forEach(name=>{
+        const l=mapData.layers.find(l=>l.type==='tilelayer'&&l.name===name&&l.visible);
+        if(l) for(let i=0;i<l.data.length;i++) drawTile(l.data[i],i%mapData.width,Math.floor(i/mapData.width));
       });
 
-      // Water shimmer particles + animated water ripples + flowers (below players)
       drawParticlesOfType('shimmer');
       drawAnimDecors('bottom');
-
-      // NPC Animals (below players for Y-sorting illusion)
       drawNpcAnimals();
+      drawPlayerTrails();
 
-      // 2. Players (Y-sorted)
-      let playerList = Object.values(clientPlayers).sort((a, b) => a.displayY - b.displayY);
-      playerList.forEach(p => {
-        const sx = p.displayX;
-        const sy = p.displayY;
-        const DIR = { 'S': 0, 'N': 1, 'W': 2, 'E': 3 };
-        const col = DIR[(p.lastDirection || 'S').toUpperCase()] || 0;
-        const row = Math.floor(p.animFrame);
+      // Zone highlight for selected player's location
+      if(selectedPlayerId&&clientPlayers[selectedPlayerId]){
+        const sp=clientPlayers[selectedPlayerId];
+        const zl=mapData.layers.find(l=>l.type==='objectgroup');
+        if(zl){
+          const zone=zl.objects.find(z=>z.name===sp.currentZoneName);
+          if(zone){
+            const sx2=TILE_SIZE/mapData.tilewidth,sy2=TILE_SIZE/mapData.tileheight;
+            const pulse=0.5+0.5*Math.sin(Date.now()/400);
+            ctx.save();
+            ctx.strokeStyle=`rgba(116,185,255,${0.3+0.35*pulse})`;
+            ctx.lineWidth=Math.max(1,3/camera.zoom);
+            ctx.shadowColor='#74b9ff'; ctx.shadowBlur=12/camera.zoom;
+            ctx.beginPath(); ctx.roundRect(zone.x*sx2,zone.y*sy2,zone.width*sx2,zone.height*sy2,4); ctx.stroke();
+            ctx.shadowBlur=0; ctx.restore();
+          }
+        }
+      }
 
-        // Use per-player character sprite or fallback
-        const spriteImg = (p.sprite && characterImages[p.sprite]) ? characterImages[p.sprite] : images['player'];
-        const pw = spriteImg.width / 4;
-        const ph = spriteImg.height / 4;
-        ctx.drawImage(spriteImg, col * pw, row * ph, pw, ph, sx, sy - 10, TILE_SIZE * 1.2, TILE_SIZE * 1.2);
+      // 2. Players Y-sorted
+      Object.values(clientPlayers).sort((a,b)=>a.displayY-b.displayY).forEach(p=>{
+        const sx=p.displayX,sy=p.displayY;
+        const col={'S':0,'N':1,'W':2,'E':3}[(p.lastDirection||'S').toUpperCase()]||0;
+        const row=Math.floor(p.animFrame);
+        const si=(p.sprite&&characterImages[p.sprite])?characterImages[p.sprite]:images['player'];
+        const pw=si.width/4,ph=si.height/4;
+        ctx.drawImage(si,col*pw,row*ph,pw,ph,sx,sy-10,TILE_SIZE*1.2,TILE_SIZE*1.2);
+        const cx2=sx+TILE_SIZE/2;
 
-        const centerX = sx + TILE_SIZE / 2;
-
-        // Selected player highlight (from AI panel)
-        if (selectedPlayerId && p.id === selectedPlayerId) {
-          const flashAlpha = Math.max(0, 0.4 - (Date.now() - selectedFlashTime) / 2000 * 0.3);
-          ctx.strokeStyle = `rgba(116, 185, 255, ${0.5 + 0.3 * Math.sin(Date.now() / 300)})`;
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.roundRect(sx - 3, sy - 13, TILE_SIZE * 1.2 + 6, TILE_SIZE * 1.2 + 6, 6);
-          ctx.stroke();
-          // Arrow indicator above
-          const arrowY = sy - 22 + Math.sin(Date.now() / 400) * 3;
-          ctx.fillStyle = '#74b9ff';
-          ctx.beginPath();
-          ctx.moveTo(centerX - 4, arrowY);
-          ctx.lineTo(centerX + 4, arrowY);
-          ctx.lineTo(centerX, arrowY + 5);
-          ctx.closePath(); ctx.fill();
+        // Selection ring + arrow
+        if(selectedPlayerId&&p.id===selectedPlayerId){
+          ctx.strokeStyle=`rgba(116,185,255,${0.5+0.3*Math.sin(Date.now()/300)})`;
+          ctx.lineWidth=2/camera.zoom;
+          ctx.beginPath(); ctx.roundRect(sx-3,sy-13,TILE_SIZE*1.2+6,TILE_SIZE*1.2+6,6); ctx.stroke();
+          const ay=sy-22+Math.sin(Date.now()/400)*3;
+          ctx.fillStyle='#74b9ff'; ctx.beginPath(); ctx.moveTo(cx2-4,ay); ctx.lineTo(cx2+4,ay); ctx.lineTo(cx2,ay+5); ctx.closePath(); ctx.fill();
         }
 
-        // Name with breathing animation
-        const floatY = Math.sin(Date.now() / 300 + p.x) * 2;
-        const nameY = sy - 15 + floatY;
-        ctx.font = '400 14px "Pixelify Sans", "Comic Sans MS", sans-serif';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
-        ctx.strokeStyle = 'rgba(26, 26, 46, 0.9)';
-        ctx.strokeText(p.name, centerX, nameY);
-        ctx.fillStyle = p.name === 'Observer' ? '#f1c40f' : '#ffffff';
-        ctx.fillText(p.name, centerX, nameY);
+        // Name label
+        const floatY=Math.sin(Date.now()/300+p.x)*2;
+        const nameY=sy-15+floatY;
+        ctx.font='400 14px "Pixelify Sans","Comic Sans MS",sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.strokeStyle='rgba(26,26,46,0.9)'; ctx.strokeText(p.name,cx2,nameY);
+        ctx.fillStyle=p.name==='Observer'?'#f1c40f':'#ffffff'; ctx.fillText(p.name,cx2,nameY);
 
-        // Thought / chat / interaction bubbles
-        const bubbleY = sy - 27 + floatY;
-        if (p.isThinking) {
-          // Thinking: emote bubble with cycling emotes (dots, question, exclamation)
-          const thinkEmotes = [1, 6, 2]; // emote1=dots, emote6=question, emote2=exclamation
-          const emoteIdx = thinkEmotes[Math.floor(Date.now() / 900) % thinkEmotes.length];
-          const emoteImg = emoteImages[emoteIdx];
-          // Draw small cloud bubble
-          const bw = 28, bh = 28;
-          const bx = centerX - bw / 2, by = bubbleY - bh;
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-          ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 10); ctx.fill();
-          ctx.strokeStyle = '#a4b0be'; ctx.lineWidth = 2; ctx.stroke();
-          // Small tail dots
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-          ctx.beginPath(); ctx.arc(centerX - 5, bubbleY + 2, 3, 0, Math.PI * 2); ctx.fill();
-          ctx.beginPath(); ctx.arc(centerX - 2, bubbleY + 6, 2, 0, Math.PI * 2); ctx.fill();
-          // Draw emote icon
-          if (emoteImg && emoteImg.complete) {
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(emoteImg, bx + (bw - 18) / 2, by + (bh - 18) / 2, 18, 18);
-            ctx.imageSmoothingEnabled = true;
-          }
-        } else if (p.interactionText) {
-          // Interaction bubble with item icon + text
-          const actText = p.interactionText.length > 16 ? p.interactionText.substring(0, 16) + '...' : p.interactionText;
-          ctx.font = '400 12px "Pixelify Sans", sans-serif';
-          const actWidth = ctx.measureText(actText).width;
-          const hasIcon = p.interactionIcon && itemImages[p.interactionIcon];
-          const iconSpace = hasIcon ? 20 : 0;
-          const bubblePad = 10;
-          const bubbleW = actWidth + iconSpace + bubblePad * 2;
-          const bubbleH = 28;
-          const bubbleX = centerX - bubbleW / 2;
-          const bubbleYpos = sy - 65 + floatY;
-          // Golden bubble
-          ctx.fillStyle = 'rgba(255, 248, 220, 0.97)';
-          ctx.beginPath(); ctx.roundRect(bubbleX, bubbleYpos, bubbleW, bubbleH, 8); ctx.fill();
-          ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 2; ctx.stroke();
-          // Tail triangle
-          ctx.fillStyle = 'rgba(255, 248, 220, 0.97)';
-          ctx.beginPath();
-          ctx.moveTo(centerX - 4, bubbleYpos + bubbleH);
-          ctx.lineTo(centerX + 4, bubbleYpos + bubbleH);
-          ctx.lineTo(centerX, bubbleYpos + bubbleH + 6);
-          ctx.closePath(); ctx.fill();
-          ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 1.5; ctx.stroke();
-          // Item icon
-          let textStartX = bubbleX + bubblePad;
-          if (hasIcon) {
-            const iImg = itemImages[p.interactionIcon];
-            if (iImg.complete) {
-              ctx.imageSmoothingEnabled = false;
-              ctx.drawImage(iImg, bubbleX + bubblePad, bubbleYpos + (bubbleH - 16) / 2, 16, 16);
-              ctx.imageSmoothingEnabled = true;
-            }
-            textStartX += iconSpace;
-          }
-          // Action text
-          ctx.font = '400 12px "Pixelify Sans", sans-serif';
-          ctx.fillStyle = '#8B5E14'; ctx.textAlign = 'left';
-          ctx.fillText(actText, textStartX, bubbleYpos + bubbleH / 2 + 1);
-          ctx.textAlign = 'center'; // reset
-        } else if (p.message) {
-          const msgText = p.message.length > 30 ? p.message.substring(0, 30) + '...' : p.message;
-          ctx.font = '400 14px "Pixelify Sans", sans-serif';
-          const msgWidth = ctx.measureText(msgText).width;
-          const bubblePad = 16;
-          const bubbleW = msgWidth + bubblePad * 2;
-          const bubbleH = 30;
-          const bubbleX = centerX - bubbleW / 2;
-          const bubbleYpos = sy - 65 + floatY;
-          ctx.fillStyle = 'white'; ctx.beginPath(); ctx.roundRect(bubbleX, bubbleYpos, bubbleW, bubbleH, 8); ctx.fill();
-          ctx.strokeStyle = '#8ecf7e'; ctx.lineWidth = 2; ctx.stroke();
-          ctx.fillStyle = '#5c4a3d'; ctx.textAlign = 'center';
-          ctx.fillText(msgText, centerX, bubbleYpos + bubbleH / 2);
+        // Bubbles
+        const bubbleY=sy-27+floatY;
+        if(p.isThinking){
+          const thinkEmotes=[1,6,2],idx=thinkEmotes[Math.floor(Date.now()/900)%3],ei=emoteImages[idx];
+          const bw=28,bh=28,bx=cx2-14,by=bubbleY-bh;
+          ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,10); ctx.fill();
+          ctx.strokeStyle='#a4b0be'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+          ctx.fillStyle='rgba(255,255,255,0.9)';
+          ctx.beginPath(); ctx.arc(cx2-5,bubbleY+2,3,0,Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx2-2,bubbleY+6,2,0,Math.PI*2); ctx.fill();
+          if(ei&&ei.complete){ctx.imageSmoothingEnabled=false;ctx.drawImage(ei,bx+(bw-18)/2,by+(bh-18)/2,18,18);ctx.imageSmoothingEnabled=true;}
+        } else if(p.interactionText){
+          const actText=p.interactionText.length>16?p.interactionText.substring(0,16)+'...':p.interactionText;
+          ctx.font='400 12px "Pixelify Sans",sans-serif';
+          const hasIcon=p.interactionIcon&&itemImages[p.interactionIcon];
+          const iconSpace=hasIcon?20:0, pad=10;
+          const bw=ctx.measureText(actText).width+iconSpace+pad*2, bh=28;
+          const bx=cx2-bw/2, by=sy-65+floatY;
+          ctx.fillStyle='rgba(255,248,220,0.97)'; ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8); ctx.fill();
+          ctx.strokeStyle='#e67e22'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+          ctx.fillStyle='rgba(255,248,220,0.97)'; ctx.beginPath(); ctx.moveTo(cx2-4,by+bh); ctx.lineTo(cx2+4,by+bh); ctx.lineTo(cx2,by+bh+6); ctx.closePath(); ctx.fill();
+          ctx.strokeStyle='#e67e22'; ctx.lineWidth=1.5/camera.zoom; ctx.stroke();
+          let tx=bx+pad;
+          if(hasIcon){const ii=itemImages[p.interactionIcon];if(ii.complete){ctx.imageSmoothingEnabled=false;ctx.drawImage(ii,bx+pad,by+(bh-16)/2,16,16);ctx.imageSmoothingEnabled=true;}tx+=iconSpace;}
+          ctx.font='400 12px "Pixelify Sans",sans-serif'; ctx.fillStyle='#8B5E14'; ctx.textAlign='left';
+          ctx.fillText(actText,tx,by+bh/2+1); ctx.textAlign='center';
+        } else if(p.message){
+          const msg=p.message.length>30?p.message.substring(0,30)+'...':p.message;
+          ctx.font='400 14px "Pixelify Sans",sans-serif';
+          const bw=ctx.measureText(msg).width+32,bh=30,bx=cx2-bw/2,by=sy-65+floatY;
+          ctx.fillStyle='white'; ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8); ctx.fill();
+          ctx.strokeStyle='#8ecf7e'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+          ctx.fillStyle='#5c4a3d'; ctx.fillText(msg,cx2,by+bh/2);
         }
       });
 
-      // 3. Top (occlusion) layers
-      const topLayers = ["Nature", "Building", "BuildingTop"];
-      mapData.layers.forEach(layer => {
-        if (layer.type === 'tilelayer' && topLayers.includes(layer.name) && layer.visible) {
-          for (let i = 0; i < layer.data.length; i++) {
-            drawTile(layer.data[i], i % mapData.width, Math.floor(i / mapData.width));
-          }
-        }
+      // 3. Top layers
+      ['Nature','Building','BuildingTop'].forEach(name=>{
+        const l=mapData.layers.find(l=>l.type==='tilelayer'&&l.name===name&&l.visible);
+        if(l) for(let i=0;i<l.data.length;i++) drawTile(l.data[i],i%mapData.width,Math.floor(i/mapData.width));
       });
-
-      // 4. Flags and top decorations (above buildings)
       drawAnimDecors('top');
-
-      // 5. Leaf and firefly particles (above everything)
       drawParticlesOfType('leaf');
       drawParticlesOfType('firefly');
 
-      // 5. Day/night overlay
-      const overlay = getDayNightOverlay();
-      if (overlay.a > 0) {
-        ctx.fillStyle = `rgba(${overlay.r}, ${overlay.g}, ${overlay.b}, ${overlay.a})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      // Day/night overlay (covers viewport in world space)
+      const ov=getDayNightOverlay();
+      if(ov.a>0){ ctx.fillStyle=`rgba(${ov.r},${ov.g},${ov.b},${ov.a})`; ctx.fillRect(camera.x,camera.y,VIEWPORT_W/camera.zoom,VIEWPORT_H/camera.zoom); }
 
-      // 6. Mouse hover zone tooltip
-      const zoneLayer = mapData.layers.find(l => l.name === 'SemanticZones' || l.type === 'objectgroup');
-      if (zoneLayer && zoneLayer.objects) {
-        zoneLayer.objects.forEach(zone => {
-          const scaleX = TILE_SIZE / mapData.tilewidth, scaleY = TILE_SIZE / mapData.tileheight;
-          const rx = zone.x * scaleX, ry = zone.y * scaleY;
-          const rw = zone.width * scaleX, rh = zone.height * scaleY;
-          if (mouseX >= rx && mouseX <= rx + rw && mouseY >= ry && mouseY <= ry + rh) {
-            ctx.font = 'bold 16px "Pixelify Sans", sans-serif';
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            const labelText = zone.name;
-            const textWidth = ctx.measureText(labelText).width;
-            const padding = 20;
-            const rectW = textWidth + padding;
-            const rectH = 35;
-            const rectX = mouseX - 15;
-            const rectY = mouseY - 30;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
-            ctx.beginPath(); ctx.roundRect(rectX, rectY, rectW, rectH, 8); ctx.fill();
-            ctx.strokeStyle = '#f39c12'; ctx.lineWidth = 2; ctx.stroke();
-            ctx.fillStyle = '#5c4a3d';
-            ctx.fillText(labelText, rectX + rectW / 2, rectY + rectH / 2);
+      // Zone hover tooltip
+      const zl=mapData.layers.find(l=>l.type==='objectgroup');
+      if(zl&&zl.objects&&mouseX>=0){
+        zl.objects.forEach(zone=>{
+          const sx2=TILE_SIZE/mapData.tilewidth,sy2=TILE_SIZE/mapData.tileheight;
+          const rx=zone.x*sx2,ry=zone.y*sy2,rw=zone.width*sx2,rh=zone.height*sy2;
+          if(mouseX>=rx&&mouseX<=rx+rw&&mouseY>=ry&&mouseY<=ry+rh){
+            ctx.font='bold 16px "Pixelify Sans",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+            const tw=ctx.measureText(zone.name).width+20,th=35,tx=mouseX-15,ty=mouseY-30;
+            ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.roundRect(tx,ty,tw,th,8); ctx.fill();
+            ctx.strokeStyle='#f39c12'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+            ctx.fillStyle='#5c4a3d'; ctx.fillText(zone.name,tx+tw/2,ty+th/2);
           }
         });
       }
+
+      // Restore to screen space
+      ctx.restore();
+      ctx.imageSmoothingEnabled=true;
+
+      // === Screen-space: detect hovered player ===
+      hoveredPlayerId=null;
+      for(const id in clientPlayers){
+        const p=clientPlayers[id]; if(p.name==='Observer') continue;
+        const spx=(p.displayX-camera.x)*camera.zoom, spy=(p.displayY-camera.y)*camera.zoom;
+        const pw2=TILE_SIZE*1.2*camera.zoom, ph2=TILE_SIZE*1.2*camera.zoom;
+        if(mouseScreenX>=spx&&mouseScreenX<=spx+pw2&&mouseScreenY>=spy-10*camera.zoom&&mouseScreenY<=spy+ph2){ hoveredPlayerId=id; break; }
+      }
+
+      // Draw hover card
+      if(hoveredPlayerId&&clientPlayers[hoveredPlayerId]){
+        const p=clientPlayers[hoveredPlayerId];
+        const spx=(p.displayX-camera.x)*camera.zoom+TILE_SIZE*camera.zoom/2;
+        const spy=(p.displayY-camera.y)*camera.zoom;
+        drawPlayerHoverCard(p,spx,spy);
+      }
     }
 
-    function drawParticlesOfType(type) {
-      for (const p of particles) {
-        if (p.type !== type) continue;
-        const fadeRatio = Math.min(1, p.life / (p.maxLife * 0.3));
-        if (p.type === 'firefly') {
-          const glow = 0.4 + 0.6 * Math.sin(Date.now() / 200 + p.phase);
-          const alpha = fadeRatio * glow;
-          // Glow ring
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size * 4, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(200, 255, 100, ${alpha * 0.15})`; ctx.fill();
-          // Try spark sprite, fallback to circle
-          const sparkImg = particleSprites['Spark'];
-          if (sparkImg && sparkImg.complete) {
-            const fw = sparkImg.width / 9; // ~9 spark variants in strip
-            const frame = Math.floor(Date.now() / 200 + p.phase) % Math.max(1, Math.floor(sparkImg.width / 8));
-            ctx.save(); ctx.globalAlpha = alpha * 0.9; ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(sparkImg, frame * fw, 0, fw, sparkImg.height, p.x - p.size * 1.5, p.y - p.size * 1.5, p.size * 3, p.size * 3);
-            ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = true; ctx.restore();
-          } else {
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(240, 255, 150, ${alpha * 0.9})`; ctx.fill();
-          }
-        } else if (p.type === 'leaf') {
-          // Use sprite-based leaf
-          const leafType = (p.x + p.y) % 2 === 0 ? 'Leaf' : 'LeafPink';
-          const leafImg = particleSprites[leafType];
-          if (leafImg && leafImg.complete) {
-            const fw = leafImg.height; // each leaf is roughly square
-            const numFrames = Math.max(1, Math.floor(leafImg.width / fw));
-            const frame = Math.floor(p.rot * 2) % numFrames;
-            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot * 0.3);
-            ctx.globalAlpha = fadeRatio * 0.8; ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(leafImg, Math.abs(frame) * fw, 0, fw, leafImg.height, -p.size * 1.5, -p.size * 1.5, p.size * 3, p.size * 3);
-            ctx.globalAlpha = 1; ctx.imageSmoothingEnabled = true; ctx.restore();
-          } else {
-            ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
-            ctx.globalAlpha = fadeRatio * 0.7; ctx.fillStyle = '#6ab04c';
-            ctx.fillRect(-p.size, -p.size / 2, p.size * 2, p.size);
-            ctx.globalAlpha = 1; ctx.restore();
-          }
-        } else if (p.type === 'shimmer') {
-          const alpha = fadeRatio * (0.3 + 0.3 * Math.sin(Date.now() / 150 + p.x));
-          ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(200, 230, 255, ${alpha})`; ctx.fill();
+    // ==========================================
+    // === drawParticlesOfType() ===
+    // ==========================================
+    function drawParticlesOfType(type){
+      for(const p of particles){
+        if(p.type!==type) continue;
+        const fadeRatio=Math.min(1,p.life/(p.maxLife*0.3));
+        if(type==='firefly'){
+          const glow=0.4+0.6*Math.sin(Date.now()/200+p.phase),alpha=fadeRatio*glow;
+          ctx.beginPath();ctx.arc(p.x,p.y,p.size*4,0,Math.PI*2);ctx.fillStyle=`rgba(200,255,100,${alpha*0.15})`;ctx.fill();
+          const si=particleSprites['Spark'];
+          if(si&&si.complete){const fw=si.width/9,fr=Math.floor(Date.now()/200+p.phase)%Math.max(1,Math.floor(si.width/8));ctx.save();ctx.globalAlpha=alpha*0.9;ctx.imageSmoothingEnabled=false;ctx.drawImage(si,fr*fw,0,fw,si.height,p.x-p.size*1.5,p.y-p.size*1.5,p.size*3,p.size*3);ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.restore();}
+          else{ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=`rgba(240,255,150,${alpha*0.9})`;ctx.fill();}
+        } else if(type==='leaf'){
+          const lt=(p.x+p.y)%2===0?'Leaf':'LeafPink',li=particleSprites[lt];
+          if(li&&li.complete){const fw=li.height,nf=Math.max(1,Math.floor(li.width/fw)),fr=Math.floor(p.rot*2)%nf;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot*0.3);ctx.globalAlpha=fadeRatio*0.8;ctx.imageSmoothingEnabled=false;ctx.drawImage(li,Math.abs(fr)*fw,0,fw,li.height,-p.size*1.5,-p.size*1.5,p.size*3,p.size*3);ctx.globalAlpha=1;ctx.imageSmoothingEnabled=true;ctx.restore();}
+          else{ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.rot);ctx.globalAlpha=fadeRatio*0.7;ctx.fillStyle='#6ab04c';ctx.fillRect(-p.size,-p.size/2,p.size*2,p.size);ctx.globalAlpha=1;ctx.restore();}
+        } else if(type==='shimmer'){
+          const alpha=fadeRatio*(0.3+0.3*Math.sin(Date.now()/150+p.x));
+          ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fillStyle=`rgba(200,230,255,${alpha})`;ctx.fill();
         }
       }
     }
 
+    // ==========================================
     // === drawMinimap() ===
-    function drawMinimap() {
-      if (!mapData) return;
-      const mw = miniCanvas.width;
-      const mh = miniCanvas.height;
-      const mapW = mapData.width * TILE_SIZE;
-      const mapH = mapData.height * TILE_SIZE;
-      const scale = Math.min(mw / mapW, mh / mapH);
+    // ==========================================
+    function drawMinimap(){
+      if(!mapData) return;
+      const mw=miniCanvas.width,mh=miniCanvas.height;
+      const mapPixelW=mapData.width*TILE_SIZE,mapPixelH=mapData.height*TILE_SIZE;
+      const scale=Math.min(mw/mapPixelW,mh/mapPixelH);
+      miniCtx.clearRect(0,0,mw,mh);
+      miniCtx.fillStyle='#2d3436'; miniCtx.fillRect(0,0,mw,mh);
 
-      miniCtx.clearRect(0, 0, mw, mh);
-
-      // Background
-      miniCtx.fillStyle = '#2d3436';
-      miniCtx.fillRect(0, 0, mw, mh);
-
-      // Draw zone areas
-      const zoneLayer = mapData.layers.find(l => l.name === 'SemanticZones' || l.type === 'objectgroup');
-      if (zoneLayer && zoneLayer.objects) {
-        const tileScale = TILE_SIZE / mapData.tilewidth;
-        zoneLayer.objects.forEach(zone => {
-          const name = (zone.name || '').toLowerCase();
-          if (name.includes('paved') || name.includes('road')) return; // skip roads
-          const zx = zone.x * tileScale * scale;
-          const zy = zone.y * tileScale * scale;
-          const zw = Math.max((zone.width || 20) * tileScale * scale, 4);
-          const zh = Math.max((zone.height || 20) * tileScale * scale, 4);
-
-          // Color by type
-          if (name.includes('pond') || name.includes('water')) miniCtx.fillStyle = 'rgba(116, 185, 255, 0.4)';
-          else if (name.includes('tree') || name.includes('grass')) miniCtx.fillStyle = 'rgba(106, 176, 76, 0.4)';
-          else miniCtx.fillStyle = 'rgba(253, 203, 110, 0.3)';
-          miniCtx.fillRect(zx, zy, zw, zh);
-
-          // Label for buildings
-          if (!name.includes('tree') && !name.includes('paved') && !name.includes('grass')) {
-            miniCtx.font = '7px "Pixelify Sans", sans-serif';
-            miniCtx.fillStyle = 'rgba(255,255,255,0.7)';
-            miniCtx.textAlign = 'center'; miniCtx.textBaseline = 'middle';
-            // Use short name
-            const shortName = zone.name.split('(')[0].trim().substring(0, 6);
-            miniCtx.fillText(shortName, zx + zw / 2, zy + zh / 2);
+      const zl=mapData.layers.find(l=>l.type==='objectgroup');
+      if(zl&&zl.objects){
+        const ts=TILE_SIZE/mapData.tilewidth;
+        zl.objects.forEach(zone=>{
+          const n=(zone.name||'').toLowerCase();
+          if(n.includes('paved')||n.includes('road')) return;
+          const zx=zone.x*ts*scale,zy=zone.y*ts*scale;
+          const zw=Math.max((zone.width||20)*ts*scale,4),zh=Math.max((zone.height||20)*ts*scale,4);
+          // Highlight selected player's zone
+          if(selectedPlayerId&&clientPlayers[selectedPlayerId]&&clientPlayers[selectedPlayerId].currentZoneName===zone.name){
+            miniCtx.fillStyle='rgba(116,185,255,0.5)'; miniCtx.fillRect(zx,zy,zw,zh);
+            miniCtx.strokeStyle='#74b9ff'; miniCtx.lineWidth=1.5; miniCtx.strokeRect(zx,zy,zw,zh);
+          } else if(n.includes('pond')||n.includes('water')){miniCtx.fillStyle='rgba(116,185,255,0.4)';miniCtx.fillRect(zx,zy,zw,zh);}
+          else if(n.includes('tree')||n.includes('grass')){miniCtx.fillStyle='rgba(106,176,76,0.4)';miniCtx.fillRect(zx,zy,zw,zh);}
+          else{miniCtx.fillStyle='rgba(253,203,110,0.3)';miniCtx.fillRect(zx,zy,zw,zh);}
+          if(!n.includes('tree')&&!n.includes('paved')&&!n.includes('grass')){
+            miniCtx.font='7px "Pixelify Sans",sans-serif';miniCtx.fillStyle='rgba(255,255,255,0.7)';
+            miniCtx.textAlign='center';miniCtx.textBaseline='middle';
+            miniCtx.fillText(zone.name.split('(')[0].trim().substring(0,6),zx+zw/2,zy+zh/2);
           }
         });
       }
 
-      // Draw player dots
-      for (const id in clientPlayers) {
-        const p = clientPlayers[id];
-        const px = p.displayX * scale + 2;
-        const py = p.displayY * scale + 2;
-        // Dot
-        miniCtx.beginPath();
-        miniCtx.arc(px, py, 3, 0, Math.PI * 2);
-        miniCtx.fillStyle = p.name === 'Observer' ? '#f1c40f' : '#e74c3c';
-        miniCtx.fill();
-        // Name
-        miniCtx.font = 'bold 8px "Pixelify Sans", sans-serif';
-        miniCtx.fillStyle = '#fff';
-        miniCtx.textAlign = 'center';
-        miniCtx.fillText(p.name, px, py - 6);
+      // Player dots
+      for(const id in clientPlayers){
+        const p=clientPlayers[id];
+        const px=p.displayX*scale+2,py=p.displayY*scale+2;
+        miniCtx.beginPath(); miniCtx.arc(px,py,id===selectedPlayerId?4:3,0,Math.PI*2);
+        miniCtx.fillStyle=id===selectedPlayerId?'#74b9ff':(p.name==='Observer'?'#f1c40f':'#e74c3c'); miniCtx.fill();
+        miniCtx.font='bold 8px "Pixelify Sans",sans-serif'; miniCtx.fillStyle='#fff'; miniCtx.textAlign='center';
+        miniCtx.fillText(p.name,px,py-6);
       }
+
+      // Viewport rectangle
+      const vx=camera.x*scale,vy=camera.y*scale;
+      const vw=(VIEWPORT_W/camera.zoom)*scale,vh=(VIEWPORT_H/camera.zoom)*scale;
+      miniCtx.strokeStyle='rgba(255,255,255,0.65)'; miniCtx.lineWidth=1;
+      miniCtx.setLineDash([3,2]); miniCtx.strokeRect(vx,vy,vw,vh); miniCtx.setLineDash([]);
     }
 
-    // === Chat log functions ===
-    function addChatMessage(name, message, timestamp) {
-      chatMessages.push({ type: 'chat', name, message, time: timestamp || Date.now() });
-      if (chatMessages.length > MAX_DISPLAY_MESSAGES) chatMessages.shift();
-      renderChatEntry({ type: 'chat', name, message, time: timestamp || Date.now() });
+    // ==========================================
+    // === Chat log ===
+    // ==========================================
+    function addChatMessage(name,message,timestamp){
+      chatMessages.push({type:'chat',name,message,time:timestamp||Date.now()});
+      if(chatMessages.length>MAX_DISPLAY_MESSAGES) chatMessages.shift();
+      renderChatEntry({type:'chat',name,message,time:timestamp||Date.now()});
     }
-
-    function addInteractionMessage(entry) {
-      chatMessages.push({ type: 'interaction', ...entry });
-      if (chatMessages.length > MAX_DISPLAY_MESSAGES) chatMessages.shift();
-      renderChatEntry({ type: 'interaction', ...entry });
+    function addInteractionMessage(entry){
+      chatMessages.push({type:'interaction',...entry});
+      if(chatMessages.length>MAX_DISPLAY_MESSAGES) chatMessages.shift();
+      renderChatEntry({type:'interaction',...entry});
     }
-
-    function renderChatEntry(entry) {
-      const div = document.createElement('div');
-      div.className = 'chat-entry';
-      const timeStr = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      if (entry.type === 'chat') {
-        div.innerHTML = `<span class="chat-time">${timeStr}</span> <span class="chat-name">${escapeHtml(entry.name)}</span>: ${escapeHtml(entry.message)}`;
-      } else {
-        div.className = 'chat-entry interaction-entry';
-        div.innerHTML = `<span class="chat-time">${timeStr}</span> ${escapeHtml(entry.name)} @ ${escapeHtml(entry.zone || '')}: ${escapeHtml(entry.action || '')}`;
+    function renderChatEntry(entry){
+      const div=document.createElement('div');
+      div.className='chat-entry';
+      const t=new Date(entry.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      if(entry.type==='chat')
+        div.innerHTML=`<span class="chat-time">${t}</span> <span class="chat-name">${escapeHtml(entry.name)}</span>: ${escapeHtml(entry.message)}`;
+      else{
+        div.className='chat-entry interaction-entry';
+        div.innerHTML=`<span class="chat-time">${t}</span> ${escapeHtml(entry.name)} @ ${escapeHtml(entry.zone||'')}: ${escapeHtml(entry.action||'')}`;
       }
-      chatlogEl.appendChild(div);
-      chatlogEl.scrollTop = chatlogEl.scrollHeight;
+      chatlogEl.appendChild(div); chatlogEl.scrollTop=chatlogEl.scrollHeight;
     }
+    function escapeHtml(text){ const d=document.createElement('div'); d.textContent=text||''; return d.innerHTML; }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text || '';
-      return div.innerHTML;
-    }
-
-    // === AI Panel functions ===
-    function updateAiPanel() {
-      const players = Object.values(clientPlayers).filter(p => p.name !== 'Observer');
-      aiCountEl.textContent = `${players.length} online`;
-
-      aiListEl.innerHTML = '';
-      players.forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'ai-card' + (selectedPlayerId === p.id ? ' selected' : '');
-
-        // Create avatar canvas
-        const avatarCanvas = document.createElement('canvas');
-        avatarCanvas.width = 16; avatarCanvas.height = 16;
-        avatarCanvas.className = 'ai-avatar';
-        const spriteImg = (p.sprite && characterImages[p.sprite]) ? characterImages[p.sprite] : images['player'];
-        if (spriteImg && spriteImg.complete) {
-          const actx = avatarCanvas.getContext('2d');
-          actx.imageSmoothingEnabled = false;
-          const pw = spriteImg.width / 4, ph = spriteImg.height / 4;
-          actx.drawImage(spriteImg, 0, 0, pw, ph, 0, 0, 16, 16);
-        }
-
-        const zoneName = (p.currentZoneName || p.lastZone || '小镇街道');
-        const statusClass = p.isThinking ? 'thinking' : 'idle';
-        card.innerHTML = `
-          <div class="ai-info">
-            <div class="ai-name">${escapeHtml(p.name)}</div>
-            <div class="ai-zone">${escapeHtml(zoneName)}</div>
-          </div>
-          <div class="ai-status-dot ${statusClass}" title="${p.isThinking ? 'Thinking...' : 'Idle'}"></div>
-        `;
-        card.prepend(avatarCanvas);
-
-        card.addEventListener('click', () => {
-          if (selectedPlayerId === p.id) {
-            selectedPlayerId = null;
-            activityDetailEl.classList.remove('visible');
-          } else {
-            selectedPlayerId = p.id;
-            activityDetailEl.classList.add('visible');
-            activityDetailNameEl.textContent = p.name;
-            renderActivityLog(p.id);
-            // Center camera on this player
-            if (p.displayX !== undefined) {
-              const camX = p.displayX - canvas.width / 2;
-              const camY = p.displayY - canvas.height / 2;
-              // Highlight with a flash
-              selectedFlashTime = Date.now();
-            }
-          }
-          updateAiPanel(); // re-render to update selection style
+    // ==========================================
+    // === AI Panel ===
+    // ==========================================
+    function updateAiPanel(){
+      const players=Object.values(clientPlayers).filter(p=>p.name!=='Observer');
+      aiCountEl.textContent=`${players.length} online`;
+      aiListEl.innerHTML='';
+      players.forEach(p=>{
+        const card=document.createElement('div');
+        card.className='ai-card'+(selectedPlayerId===p.id?' selected':'');
+        const ac=document.createElement('canvas'); ac.width=16; ac.height=16; ac.className='ai-avatar';
+        const si=(p.sprite&&characterImages[p.sprite])?characterImages[p.sprite]:images['player'];
+        if(si&&si.complete){const actx=ac.getContext('2d');actx.imageSmoothingEnabled=false;actx.drawImage(si,0,0,si.width/4,si.height/4,0,0,16,16);}
+        card.innerHTML=`<div class="ai-info"><div class="ai-name">${escapeHtml(p.name)}</div><div class="ai-zone">${escapeHtml(p.currentZoneName||'小镇街道')}</div></div><div class="ai-status-dot ${p.isThinking?'thinking':'idle'}"></div>`;
+        card.prepend(ac);
+        card.addEventListener('click',()=>{
+          if(selectedPlayerId===p.id){ selectedPlayerId=null; isCameraFollowing=false; activityDetailEl.classList.remove('visible'); }
+          else selectAndFollowPlayer(p.id);
+          updateAiPanel();
         });
-
         aiListEl.appendChild(card);
       });
-
-      // If selected player disconnected, clear selection
-      if (selectedPlayerId && !clientPlayers[selectedPlayerId]) {
-        selectedPlayerId = null;
-        activityDetailEl.classList.remove('visible');
-      }
+      if(selectedPlayerId&&!clientPlayers[selectedPlayerId]){ selectedPlayerId=null; isCameraFollowing=false; activityDetailEl.classList.remove('visible'); }
     }
 
-    let selectedFlashTime = 0;
-
-    function renderActivityLog(playerId) {
-      const activities = playerActivityData[playerId] || [];
-      activityLogEl.innerHTML = '';
-      activities.slice().reverse().forEach(a => {
-        const div = document.createElement('div');
-        div.className = 'activity-item';
-        const timeStr = new Date(a.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        div.innerHTML = `<span class="activity-time">${timeStr}</span> <span class="activity-type-${a.type || 'move'}">${escapeHtml(a.text || '')}</span>`;
+    let selectedFlashTime=0;
+    function renderActivityLog(playerId){
+      const acts=playerActivityData[playerId]||[];
+      activityLogEl.innerHTML='';
+      acts.slice().reverse().forEach(a=>{
+        const div=document.createElement('div'); div.className='activity-item';
+        const t=new Date(a.time).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+        div.innerHTML=`<span class="activity-time">${t}</span> <span class="activity-type-${a.type||'move'}">${escapeHtml(a.text||'')}</span>`;
         activityLogEl.appendChild(div);
       });
     }
+
+    // ==========================================
+    // === Stats Panel ===
+    // ==========================================
+    function updateStatsPanel(){
+      const el=document.getElementById('stats-content'); if(!el) return;
+      const stats={}; let hasData=false;
+      for(const id in playerActivityData){
+        const p=clientPlayers[id]; if(!p||p.name==='Observer') continue;
+        const acts=playerActivityData[id]||[];
+        stats[p.name]={moves:acts.filter(a=>a.type==='move').length,says:acts.filter(a=>a.type==='say').length,interacts:acts.filter(a=>a.type==='interact').length};
+        if(acts.length>0) hasData=true;
+      }
+      const names=Object.keys(stats);
+      if(!hasData||names.length===0){el.innerHTML='<span id="stats-empty">Waiting for data...</span>';return;}
+      const topMove=names.reduce((a,b)=>stats[a].moves>=stats[b].moves?a:b);
+      const topSay=names.reduce((a,b)=>stats[a].says>=stats[b].says?a:b);
+      const topInteract=names.reduce((a,b)=>stats[a].interacts>=stats[b].interacts?a:b);
+      let html='';
+      if(stats[topMove].moves>0) html+=`<div class="stat-row">🚶 最活跃: <span class="stat-name">${escapeHtml(topMove)}</span> (${stats[topMove].moves} 步)</div>`;
+      if(stats[topSay].says>0) html+=`<div class="stat-row">💬 最健谈: <span class="stat-name">${escapeHtml(topSay)}</span> (${stats[topSay].says} 句)</div>`;
+      if(stats[topInteract].interacts>0) html+=`<div class="stat-row">🎭 最互动: <span class="stat-name">${escapeHtml(topInteract)}</span> (${stats[topInteract].interacts} 次)</div>`;
+      el.innerHTML=html||'<span id="stats-empty">Waiting for data...</span>';
+    }
+    setInterval(updateStatsPanel, 3000);
 
     // Boot
     initialize();
