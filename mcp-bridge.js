@@ -10,9 +10,11 @@ const socket = io(serverUrl);
 
 let myState = null;
 let allPlayers = {};
-let townDirectory =[]; // 小镇名录
+let townDirectory = []; // 小镇名录
 let characterList = []; // 可选角色列表
 let hasJoined = false; // 是否已加入游戏
+let recentlyHeard = []; // 最近听到的对话（环形缓冲，最多保留10条）
+const MAX_HEARD = 10;
 
 socket.on('connect', () => {
   resetWatchdog();
@@ -40,7 +42,14 @@ socket.on('stateUpdate', (players) => {
 
 socket.on('mapDirectory', (dir) => {
   resetWatchdog();
-  townDirectory = dir; 
+  townDirectory = dir;
+});
+
+socket.on('on_hear', (data) => {
+  resetWatchdog();
+  recentlyHeard.push({ ...data, time: Date.now() });
+  if (recentlyHeard.length > MAX_HEARD) recentlyHeard.shift();
+  console.error(`👂 [听到] ${data.from} (距离${data.distance}步): "${data.message}"`);
 });
 
 // ==========================================
@@ -67,11 +76,12 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
     tools:[
       { name: 'walk', description: '在小镇移动 (N北/S南/W西/E东)', inputSchema: { type: 'object', properties: { direction: { type: 'string', enum:['N', 'S', 'W', 'E'] }, steps: { type: 'number' } }, required:['direction', 'steps'] } },
       { name: 'say', description: '在小镇里说话', inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] } },
-      { name: 'look_around', description: '环顾四周，看看当前位置、环境和附近的人', inputSchema: { type: 'object', properties: {} } },
+      { name: 'look_around', description: '环顾四周，看看当前位置、环境、附近的人，以及最近听到的对话', inputSchema: { type: 'object', properties: {} } },
       { name: 'read_map_directory', description: '查看小镇的完整地图名录与重要建筑的坐标', inputSchema: { type: 'object', properties: {} } },
       { name: 'interact', description: '与当前所在区域互动（吃饭、休息、购物、训练、钓鱼等），会根据你所在的地点产生不同的故事结果', inputSchema: { type: 'object', properties: {} } },
       { name: 'list_characters', description: '查看所有可选的角色形象列表。在加入游戏前先看看有哪些角色可以选择', inputSchema: { type: 'object', properties: {} } },
-      { name: 'choose_character', description: '选择一个角色形象并加入小镇（或在加入后更换形象）。必须先用 list_characters 查看可选角色', inputSchema: { type: 'object', properties: { sprite: { type: 'string', description: '角色名称，从 list_characters 中选取' } }, required: ['sprite'] } }
+      { name: 'choose_character', description: '选择一个角色形象并加入小镇（或在加入后更换形象）。必须先用 list_characters 查看可选角色', inputSchema: { type: 'object', properties: { sprite: { type: 'string', description: '角色名称，从 list_characters 中选取' } }, required: ['sprite'] } },
+      { name: 'get_heard_messages', description: '获取你最近听到的对话记录（附近10格内其他人说的话）。可用于决定是否回应或靠近', inputSchema: { type: 'object', properties: {} } }
     ]
   };
 });
@@ -105,7 +115,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       const others = Object.values(allPlayers).filter(p => p.id !== socket.id && p.name !== 'Observer');
       if (others.length === 0) {
-        info += '四周空无一人。';
+        info += '四周空无一人。\n';
       } else {
         info += '👥 【附近的人】\n';
         others.forEach(p => {
@@ -118,6 +128,29 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
         });
       }
 
+      // 追加最近听到的对话
+      if (recentlyHeard.length > 0) {
+        info += '\n👂 【最近听到的对话】\n';
+        recentlyHeard.slice(-5).forEach(h => {
+          const ago = Math.round((Date.now() - h.time) / 1000);
+          info += `- ${h.from} (${ago}秒前, 距离${h.distance}步): "${h.message}"\n`;
+        });
+        info += '💡 提示: 你可以用 say 回应，或用 walk 靠近说话的人。\n';
+      }
+
+      return { content:[{ type: 'text', text: info }] };
+    }
+
+    if (name === 'get_heard_messages') {
+      if (recentlyHeard.length === 0) {
+        return { content:[{ type: 'text', text: '你最近没有听到任何对话。' }] };
+      }
+      let info = '👂 【近期听到的对话记录】\n';
+      recentlyHeard.slice().reverse().forEach(h => {
+        const ago = Math.round((Date.now() - h.time) / 1000);
+        info += `- [${ago}秒前] ${h.from} 在【${h.zone}】(距离${h.distance}步) 说: "${h.message}"\n`;
+      });
+      info += '\n💡 可以用 walk 靠近某人，再用 say 与他交谈。';
       return { content:[{ type: 'text', text: info }] };
     }
 
