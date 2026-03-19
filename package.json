@@ -7,12 +7,19 @@
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["mcp", "multi-agent", "pixel-art", "sandbox", "ai-agents"],
+  "keywords": [
+    "mcp",
+    "multi-agent",
+    "pixel-art",
+    "sandbox",
+    "ai-agents"
+  ],
   "author": "ceresOPA",
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "better-sqlite3": "^12.8.0",
     "express": "^5.2.1",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3"
