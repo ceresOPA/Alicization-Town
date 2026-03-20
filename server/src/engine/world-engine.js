@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { EventEmitter } = require('events');
 const { ZONE_INTERACTIONS, ZONE_CATEGORY_MAP } = require('../data/interactions');
 const { CHARACTER_SPRITES } = require('../data/characters');
+const { describeRelativeDirection } = require('./relative-direction');
 const {
   MESSAGE_TTL_MS,
   INTERACTION_TTL_MS,
@@ -474,6 +475,7 @@ function look(playerId) {
         id: other.id,
         name: other.name,
         distance,
+        relativeDirection: describeRelativeDirection(other.x - player.x, other.y - player.y, player.lastDirection),
         zone: other.currentZoneName,
         message: other.message || null,
         sprite: other.sprite,

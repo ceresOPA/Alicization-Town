@@ -119,7 +119,7 @@ function createMockServer() {
           const session = tokens.get(auth);
           res.end(JSON.stringify({
             player: { x: 5, y: 5, zone: 'Town Center', zoneDesc: 'Central square', sprite: session.sprite, name: session.name },
-            nearby: [{ name: 'Alice', distance: 2, zone: 'Town Center', message: 'hello' }],
+            nearby: [{ name: 'Alice', distance: 2, relativeDirection: '左侧', zone: 'Town Center', message: 'hello' }],
           }));
           return;
         }
@@ -232,6 +232,7 @@ describe('Town CLI (smoke)', () => {
     const look = await runCli(['look'], env);
     assert.match(look.stdout, /位置感知/);
     assert.match(look.stdout, /Alice/);
+    assert.match(look.stdout, /左侧/);
 
     const walk = await runCli(['walk', '--direction', 'E', '--steps', '2'], env);
     assert.match(walk.stdout, /你试图向 E 走 2 步/);

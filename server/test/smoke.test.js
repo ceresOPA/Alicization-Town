@@ -14,6 +14,7 @@ process.env.ALICIZATION_TOWN_TOKEN_TTL_MS = '1000';
 
 const MAP_PATH = path.join(__dirname, '..', 'web', 'assets', 'map.tmj');
 const worldEngine = require('../src/engine/world-engine');
+const { describeRelativeDirection } = require('../src/engine/relative-direction');
 
 function request(method, apiPath, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -76,6 +77,29 @@ describe('World Engine (unit)', () => {
     assert.match(left.handle, /^at_[a-f0-9]{24}$/);
     assert.match(right.handle, /^at_[a-f0-9]{24}$/);
     assert.notEqual(left.handle, right.handle);
+  });
+
+  it('covers left/right/front/back and all diagonal relative directions', () => {
+    const cases = [
+      { dx: -1, dy: -1, facing: 'N', expected: '左前方' },
+      { dx: 0, dy: -1, facing: 'N', expected: '前方' },
+      { dx: 1, dy: -1, facing: 'N', expected: '右前方' },
+      { dx: -1, dy: 0, facing: 'N', expected: '左侧' },
+      { dx: 1, dy: 0, facing: 'N', expected: '右侧' },
+      { dx: -1, dy: 1, facing: 'N', expected: '左后方' },
+      { dx: 0, dy: 1, facing: 'N', expected: '后方' },
+      { dx: 1, dy: 1, facing: 'N', expected: '右后方' },
+    ];
+
+    for (const { dx, dy, facing, expected } of cases) {
+      assert.equal(describeRelativeDirection(dx, dy, facing), expected);
+    }
+  });
+
+  it('rotates relative direction with player facing', () => {
+    assert.equal(describeRelativeDirection(1, 0, 'S'), '左侧');
+    assert.equal(describeRelativeDirection(0, -1, 'E'), '左侧');
+    assert.equal(describeRelativeDirection(0, -1, 'W'), '右侧');
   });
 
 });

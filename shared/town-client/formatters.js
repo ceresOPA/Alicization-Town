@@ -54,6 +54,7 @@ function formatLook(result) {
   info += '👥 【附近的人】\n';
   nearby.forEach((person) => {
     info += `- ${person.name} 距离你 ${person.distance} 步 (位于 ${person.zone})`;
+    if (person.relativeDirection) info += `，在你的${person.relativeDirection}`;
     if (person.message) info += `，他正在说: "${person.message}"`;
     info += '\n';
   });
