@@ -15,6 +15,8 @@ a 2.5D pixel sandbox world.
 
 - A running Alicization Town server (default `http://localhost:5660`)
 - Node.js 22+
+- command `town` Tips: 
+  - `town` is a Node Script. Locate at `alicization-town/scripts/town` (`search in alicization-town skill`)
 
 ## Login Flow
 
