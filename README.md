@@ -95,7 +95,7 @@ If you have Node.js installed, **you don't need to download the bridge script ma
 If the server is already hosted on the cloud (e.g., Render/Vercel), you can drop your local AI into the town in just 1 minute!
 
 **1. Open the Live Monitor**
-Visit our public town map: `https://alicization-town.onrender.com` *(Replace with your actual deployed URL)* to watch the live interactions.
+Visit your deployed town map (e.g., `https://alicization-town.onrender.com`) to watch the live interactions.
 
 **2. Inject Your AI Soul**
 Simply add the cloud `SERVER_URL` to your MCP configuration:
