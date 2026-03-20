@@ -4,12 +4,47 @@ const http = require('http');
 const { Server } = require('socket.io');
 const fs = require('fs');
 const path = require('path');
+const Database = require('better-sqlite3');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 const PORT = process.env.PORT || 5660;
 app.use(express.static('public'));
+
+// ==========================================
+// 💾 SQLite 持久化
+// ==========================================
+const db = new Database(path.join(__dirname, 'world.db'));
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS players (
+    name TEXT PRIMARY KEY,
+    x INTEGER NOT NULL DEFAULT 5,
+    y INTEGER NOT NULL DEFAULT 5,
+    sprite TEXT,
+    last_seen INTEGER
+  );
+  CREATE TABLE IF NOT EXISTS chat_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    time INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    message TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_time ON chat_history(time);
+`);
+
+const stmts = {
+  upsertPlayer: db.prepare(`
+    INSERT INTO players (name, x, y, sprite, last_seen) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(name) DO UPDATE SET x=excluded.x, y=excluded.y, sprite=excluded.sprite, last_seen=excluded.last_seen
+  `),
+  getPlayer:   db.prepare('SELECT * FROM players WHERE name = ?'),
+  saveChat:    db.prepare('INSERT INTO chat_history (time, name, message) VALUES (?, ?, ?)'),
+  getHistory:  db.prepare('SELECT time, name, message FROM chat_history ORDER BY time DESC LIMIT 50'),
+};
+
+console.log('💾 SQLite 数据库已就绪: world.db');
 
 // ==========================================
 // 🗺️ Tiled 地图与物理引擎
@@ -44,7 +79,7 @@ if (fs.existsSync(mapPath)) {
   console.error("❌ 找不到 map.tmj！");
 }
 
-// 🧠 精准区域判定算法 (支持“临近感知 / 边缘距离计算”)
+// 🧠 精准区域判定算法 (支持"临近感知 / 边缘距离计算")
 function getZoneAt(gridX, gridY) {
   if (semanticZones.length === 0) return null;
   
@@ -52,14 +87,14 @@ function getZoneAt(gridX, gridY) {
   const pixelX = (gridX * worldMap.tilewidth) + (worldMap.tilewidth / 2);
   const pixelY = (gridY * worldMap.tileheight) + (worldMap.tileheight / 2);
 
-  // 💥 魔法变量：感知边缘 (Margin)。允许玩家站在建筑物外围 1.5 个格子的距离内被判定为“身处该区域”
+  // 💥 魔法变量：感知边缘 (Margin)。允许玩家站在建筑物外围 1.5 个格子的距离内被判定为"身处该区域"
   const INTERACT_MARGIN = worldMap.tilewidth * 1.5; 
 
   let closestZone = null;
   let minDistance = Infinity;
 
   for (let zone of semanticZones) {
-    // 算法：计算一个“点”到一个“矩形(AABB)”的最短几何距离
+    // 算法：计算一个"点"到一个"矩形(AABB)"的最短几何距离
     // 如果点在矩形内部，dx 和 dy 都会是 0
     const dx = Math.max(zone.x - pixelX, 0, pixelX - (zone.x + zone.width));
     const dy = Math.max(zone.y - pixelY, 0, pixelY - (zone.y + zone.height));
@@ -96,8 +131,11 @@ app.get('/events', (req, res) => {
   const initData = `data: ${JSON.stringify(gameState.players)}\n\n`;
   res.write(initData);
 
-  // Send chat history
-  const historyData = `event: chatHistory\ndata: ${JSON.stringify(chatHistory)}\n\n`;
+  // Send chat history：优先从数据库读取（含跨重启记录），合并内存中最新消息去重
+  const dbHistory = stmts.getHistory.all().reverse(); // 最旧→最新
+  const merged = [...dbHistory, ...chatHistory.filter(m => !dbHistory.find(d => d.time === m.time && d.name === m.name))];
+  merged.sort((a, b) => a.time - b.time);
+  const historyData = `event: chatHistory\ndata: ${JSON.stringify(merged.slice(-50))}\n\n`;
   res.write(historyData);
 
   // 网页关闭时，从列表中移除
@@ -347,13 +385,18 @@ io.on('connection', (socket) => {
       chosenSprite = data.sprite;
     }
 
-    let spawnX = 5, spawnY = 5; // 默认坐标
+    // 从数据库读取上次位置，没有则用默认坐标
+    const saved = stmts.getPlayer.get(name);
+    let spawnX = saved ? saved.x : 5;
+    let spawnY = saved ? saved.y : 5;
     const zone = getZoneAt(spawnX, spawnY);
 
-    // Use chosen sprite if valid, otherwise assign round-robin
+    // Use chosen sprite if valid, otherwise use saved sprite or round-robin
     let sprite;
     if (chosenSprite && CHARACTER_SPRITES.includes(chosenSprite)) {
       sprite = chosenSprite;
+    } else if (saved?.sprite && CHARACTER_SPRITES.includes(saved.sprite)) {
+      sprite = saved.sprite;
     } else {
       sprite = CHARACTER_SPRITES[nextSpriteIndex % CHARACTER_SPRITES.length];
       nextSpriteIndex++;
@@ -365,11 +408,16 @@ io.on('connection', (socket) => {
       currentZoneName: zone ? zone.name : "小镇街道",
       currentZoneDesc: zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道"
     };
-    
-    // 整理一份“地图旅游指南”发给 MCP 网关
+
+    // 写入/更新数据库（首次加入或重连）
+    stmts.upsertPlayer.run(name, spawnX, spawnY, sprite, Date.now());
+    if (saved) {
+      console.log(`💾 ${name} 回到上次位置 (${spawnX}, ${spawnY})`);
+    }
+
+    // 整理一份"地图旅游指南"发给 MCP 网关
     const directory = semanticZones.map(z => ({
       name: z.name,
-      // 把原始像素坐标换算成 AI 用的网格中心坐标
       x: Math.floor((z.x + z.width/2) / worldMap.tilewidth),
       y: Math.floor((z.y + z.height/2) / worldMap.tileheight),
       description: z.properties?.find(p => p.name === 'description')?.value || ''
@@ -379,7 +427,7 @@ io.on('connection', (socket) => {
     socket.emit('mapDirectory', directory);
     io.emit('stateUpdate', gameState.players);
     broadcastStateToWeb();
-    addPlayerActivity(socket.id, { type: 'join', text: `加入了小镇 (角色: ${sprite})` });
+    addPlayerActivity(socket.id, { type: 'join', text: `加入了小镇 (角色: ${sprite})${saved ? ' [已恢复位置]' : ''}` });
   });
 
   // Allow character change after joining
@@ -430,17 +478,20 @@ io.on('connection', (socket) => {
     player.currentZoneDesc = zone ? (zone.properties?.find(p => p.name === 'description')?.value || '') : "空旷的街道";
 
     io.emit('stateUpdate', gameState.players);
-    broadcastStateToWeb(); // Bug fix: broadcast move events to SSE web viewers
+    broadcastStateToWeb();
     addPlayerActivity(socket.id, { type: 'move', text: `移动到 (${player.x}, ${player.y}) - ${player.currentZoneName}` });
+    // 持久化新位置
+    stmts.upsertPlayer.run(player.name, player.x, player.y, player.sprite, Date.now());
   });
 
   socket.on('say', (msg) => {
     if (gameState.players[socket.id]) {
       gameState.players[socket.id].message = msg;
 
-      // Add to chat history
+      // Add to chat history (内存 + 数据库)
       const chatEntry = { time: Date.now(), name: gameState.players[socket.id].name, message: msg };
       addChatHistory(chatEntry.name, chatEntry.message);
+      stmts.saveChat.run(chatEntry.time, chatEntry.name, chatEntry.message);
       broadcastChatToWeb(chatEntry);
       addPlayerActivity(socket.id, { type: 'say', text: `说: "${msg.substring(0, 30)}${msg.length > 30 ? '...' : ''}"` });
 
@@ -451,6 +502,7 @@ io.on('connection', (socket) => {
           io.emit('stateUpdate', gameState.players);
         }
       }, 5000);
+
     }
   broadcastStateToWeb();
   });
