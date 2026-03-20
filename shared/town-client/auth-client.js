@@ -141,10 +141,76 @@ async function loginWithProfile(profile) {
   };
 }
 
+function normalizeLoginMode(options = {}) {
+  if (options.respawn === true) return 'spawn';
+  if (options.loginMode === 'spawn') return 'spawn';
+  return 'resume';
+}
+
+async function loginWithProfileMode(profile, options = {}) {
+  const keystore = loadKeystore(profile.handle);
+  if (!keystore || !keystore.jwk) {
+    return {
+      status: 'reauth_required',
+      profile: profile.profile,
+      handle: profile.handle,
+      name: profile.name,
+      sprite: profile.sprite,
+      server: profile.server || null,
+      lease_expires_at: null,
+      message: '本地 profile 缺少可用认证材料，请重新创建角色。',
+    };
+  }
+
+  const server = await discoverServer(profile.server);
+  const timestamp = Date.now();
+  const signature = signLoginProof(profile.handle, timestamp, keystore.jwk);
+  const loginMode = normalizeLoginMode(options);
+  const response = await requestJson(server, 'POST', '/api/login', {
+    body: {
+      handle: profile.handle,
+      timestamp,
+      signature,
+      deviceId: keystore.deviceId,
+      loginMode,
+      respawn: loginMode === 'spawn',
+    },
+  });
+
+  const nextProfile = {
+    ...profile,
+    name: response.name || profile.name,
+    sprite: response.sprite || profile.sprite,
+    handle: response.handle || profile.handle,
+    server,
+    token: response.token,
+    expiresAt: response.expires_at || new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
+    leaseExpiresAt: response.lease_expires_at || null,
+    lastUsedAt: new Date().toISOString(),
+  };
+
+  saveProfile(nextProfile);
+  setDefaultProfileName(nextProfile.profile);
+
+  return {
+    status: response.status,
+    profile: nextProfile.profile,
+    handle: nextProfile.handle,
+    name: nextProfile.name,
+    sprite: nextProfile.sprite,
+    server: nextProfile.server,
+    lease_expires_at: nextProfile.leaseExpiresAt,
+    message: response.message,
+    token: nextProfile.token,
+    login_mode: response.login_mode || loginMode,
+  };
+}
+
 module.exports = {
   createProfile,
-  loginWithProfile,
+  loginWithProfile: loginWithProfileMode,
   generateKeyMaterial,
   signLoginProof,
   normalizeProfileName,
+  normalizeLoginMode,
 };

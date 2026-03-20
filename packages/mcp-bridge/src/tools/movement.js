@@ -20,7 +20,7 @@ async function handle(name, args, client) {
   if (!result) {
     return { content: [{ type: 'text', text: auth?.message || '当前还没有可用 profile，请先 login。' }] };
   }
-  return { content: [{ type: 'text', text: client.formatWalk(args.direction, args.steps) }] };
+  return { content: [{ type: 'text', text: client.formatWalk(args.direction, args.steps, result) }] };
 }
 
 module.exports = { definitions, handle };

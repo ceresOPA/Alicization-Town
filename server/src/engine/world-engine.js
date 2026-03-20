@@ -199,6 +199,36 @@ function createProfile(name, sprite, publicKey) {
   return { handle: createdProfile.handle, name: createdProfile.name, sprite: createdProfile.sprite };
 }
 
+function getRespawnState(profile) {
+  const spawnX = Number.isInteger(profile?.lastX) ? profile.lastX : 5;
+  const spawnY = Number.isInteger(profile?.lastY) ? profile.lastY : 5;
+  const isBlocked = !worldMap
+    || spawnX < 0
+    || spawnY < 0
+    || spawnX >= worldMap.width
+    || spawnY >= worldMap.height
+    || collisionMap[spawnY * worldMap.width + spawnX] === 1;
+
+  if (isBlocked) {
+    return { x: 5, y: 5, direction: 'S' };
+  }
+
+  return {
+    x: spawnX,
+    y: spawnY,
+    direction: ['N', 'S', 'W', 'E'].includes(profile?.lastDirection) ? profile.lastDirection : 'S',
+  };
+}
+
+function persistPlayerState(player) {
+  if (!player) return;
+  sqliteStateStore.updateProfilePosition(player.id, {
+    x: player.x,
+    y: player.y,
+    direction: player.lastDirection,
+  });
+}
+
 function getProfile(id) {
   return sqliteStateStore.getProfile(id);
 }
@@ -236,7 +266,13 @@ function destroyToken(token) {
   removePlayer(existing.id);
 }
 
-function loginProfile(handle, timestamp, signature) {
+function resolveLoginMode(options = {}) {
+  if (options.respawn === true) return 'spawn';
+  if (options.loginMode === 'spawn') return 'spawn';
+  return 'resume';
+}
+
+function loginProfile(handle, timestamp, signature, options = {}) {
   const profile = getProfileByHandle(handle) || getProfile(handle);
   if (!profile) return { error: '未找到对应 profile，请先使用 login 的创建模式创建角色。', code: 404 };
   if (!verifyLoginProof(profile, timestamp, signature)) {
@@ -249,7 +285,11 @@ function loginProfile(handle, timestamp, signature) {
 
   const token = crypto.randomUUID();
   const now = Date.now();
-  const player = join(profile.id, profile.name, profile.sprite, { trackActivity: true });
+  const loginMode = resolveLoginMode(options);
+  const player = join(profile.id, profile.name, profile.sprite, {
+    trackActivity: true,
+    profile: loginMode === 'resume' ? profile : null,
+  });
   const session = {
     id: profile.id,
     playerId: profile.id,
@@ -273,8 +313,11 @@ function loginProfile(handle, timestamp, signature) {
     token,
     expires_at: new Date(session.expiresAt).toISOString(),
     lease_expires_at: new Date(session.leaseExpiresAt).toISOString(),
+    login_mode: loginMode,
     player: sanitize(player),
-    message: hadActiveSession ? `已接管角色 ${profile.name} 的在线会话。` : `已登录角色 ${profile.name}。`,
+    message: loginMode === 'spawn'
+      ? `已重新进入小镇，${profile.name} 已回到起点。`
+      : (hadActiveSession ? `已接管角色 ${profile.name} 的在线会话。` : `已登录角色 ${profile.name}。`),
   };
 }
 
@@ -337,8 +380,9 @@ function join(playerId, name, sprite, options = {}) {
     nextSpriteIndex += 1;
   }
 
-  const spawnX = 5;
-  const spawnY = 5;
+  const spawn = getRespawnState(options.profile);
+  const spawnX = spawn.x;
+  const spawnY = spawn.y;
   const zone = getZoneAt(spawnX, spawnY);
   const now = Date.now();
   players[playerId] = {
@@ -346,7 +390,7 @@ function join(playerId, name, sprite, options = {}) {
     name,
     x: spawnX,
     y: spawnY,
-    lastDirection: 'S',
+    lastDirection: spawn.direction,
     message: '',
     interactionText: '',
     interactionIcon: '',
@@ -358,6 +402,7 @@ function join(playerId, name, sprite, options = {}) {
     lastHeartbeatAt: now,
     lastActionAt: options.trackActivity === false ? null : now,
   };
+  persistPlayerState(players[playerId]);
   addActivity(playerId, { type: 'join', text: `加入了小镇 (角色: ${assignedSprite})` });
   broadcast();
   return players[playerId];
@@ -410,6 +455,7 @@ function move(playerId, direction, steps) {
     actual += 1;
   }
   zoneInfo(player);
+  persistPlayerState(player);
   addActivity(playerId, { type: 'move', text: `移动到 (${player.x}, ${player.y}) - ${player.currentZoneName}` });
   broadcast();
   return { player: sanitize(player), actualSteps: actual, blocked };

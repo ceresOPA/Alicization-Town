@@ -208,6 +208,75 @@ describe('HTTP API (integration)', () => {
     assert.equal(staleLook.status, 401);
   });
 
+  it('restores the last known position after re-login', async () => {
+    const authMaterial = generateAuthMaterial();
+    const created = await request('POST', '/api/profiles/create', {
+      name: 'ReturnBot',
+      sprite: 'Samurai',
+      publicKey: authMaterial.publicJwk.x,
+    });
+
+    const firstTimestamp = Date.now();
+    const firstLogin = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp: firstTimestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, firstTimestamp),
+    });
+    const firstHeaders = { Authorization: `Bearer ${firstLogin.body.token}` };
+
+    const walk = await request('POST', '/api/walk', { direction: 'E', steps: 3 }, firstHeaders);
+    assert.equal(walk.status, 200);
+    assert.equal(walk.body.player.x, 8);
+    assert.equal(walk.body.player.y, 5);
+
+    const secondTimestamp = Date.now() + 1;
+    const secondLogin = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp: secondTimestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, secondTimestamp),
+    });
+
+    assert.equal(secondLogin.status, 200);
+    assert.equal(secondLogin.body.player.x, 8);
+    assert.equal(secondLogin.body.player.y, 5);
+    assert.equal(secondLogin.body.login_mode, 'resume');
+  });
+
+  it('supports explicit respawn back to the starting point', async () => {
+    const authMaterial = generateAuthMaterial();
+    const created = await request('POST', '/api/profiles/create', {
+      name: 'RespawnBot',
+      sprite: 'Samurai',
+      publicKey: authMaterial.publicJwk.x,
+    });
+
+    const firstTimestamp = Date.now();
+    const firstLogin = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp: firstTimestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, firstTimestamp),
+    });
+    const firstHeaders = { Authorization: `Bearer ${firstLogin.body.token}` };
+
+    const walk = await request('POST', '/api/walk', { direction: 'E', steps: 3 }, firstHeaders);
+    assert.equal(walk.status, 200);
+    assert.equal(walk.body.player.x, 8);
+    assert.equal(walk.body.player.y, 5);
+
+    const secondTimestamp = Date.now() + 1;
+    const secondLogin = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp: secondTimestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, secondTimestamp),
+      loginMode: 'spawn',
+    });
+
+    assert.equal(secondLogin.status, 200);
+    assert.equal(secondLogin.body.login_mode, 'spawn');
+    assert.equal(secondLogin.body.player.x, 5);
+    assert.equal(secondLogin.body.player.y, 5);
+  });
+
   it('marks online players idle and then offline based on timers', async () => {
     const authMaterial = generateAuthMaterial();
     const created = await request('POST', '/api/profiles/create', {

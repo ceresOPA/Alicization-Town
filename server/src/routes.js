@@ -63,11 +63,14 @@ router.post('/profiles/create', (req, res) => {
 });
 
 router.post('/login', (req, res) => {
-  const { handle, timestamp, signature } = req.body || {};
+  const { handle, timestamp, signature, loginMode, respawn } = req.body || {};
   if (!handle) return res.status(400).json({ error: '缺少 handle 字段' });
   if (!timestamp) return res.status(400).json({ error: '缺少 timestamp 字段' });
   if (!signature) return res.status(400).json({ error: '缺少 signature 字段' });
-  const result = worldEngine.loginProfile(handle, timestamp, signature);
+  if (loginMode && !['resume', 'spawn'].includes(loginMode)) {
+    return res.status(400).json({ error: 'loginMode 仅支持 resume 或 spawn' });
+  }
+  const result = worldEngine.loginProfile(handle, timestamp, signature, { loginMode, respawn });
   if (result.error) return res.status(result.code || 400).json({ error: result.error });
   res.json(result);
 });

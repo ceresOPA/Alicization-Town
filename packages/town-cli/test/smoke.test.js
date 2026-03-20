@@ -20,6 +20,7 @@ function createMockServer() {
   const profiles = new Map();
   const tokens = new Map();
   const activeTokens = new Map();
+  const playerStates = new Map();
   let sequence = 1000n;
 
   return new Promise((resolve) => {
@@ -70,6 +71,13 @@ function createMockServer() {
           const previousToken = activeTokens.get(profile.id);
           if (previousToken) tokens.delete(previousToken);
 
+          const loginMode = payload.loginMode === 'spawn' || payload.respawn ? 'spawn' : 'resume';
+          const priorState = playerStates.get(profile.id) || { x: 5, y: 5, direction: 'S', zone: 'Town Center', zoneDesc: 'Central square' };
+          const currentState = loginMode === 'spawn'
+            ? { x: 5, y: 5, direction: 'S', zone: 'Town Center', zoneDesc: 'Central square' }
+            : priorState;
+          playerStates.set(profile.id, currentState);
+
           const token = `token-${profile.id}-${Date.now()}`;
           tokens.set(token, { id: profile.id, name: profile.name, sprite: profile.sprite });
           activeTokens.set(profile.id, token);
@@ -81,7 +89,11 @@ function createMockServer() {
             token,
             expires_at: new Date(Date.now() + 3600000).toISOString(),
             lease_expires_at: new Date(Date.now() + 180000).toISOString(),
-            message: previousToken ? `已接管角色 ${profile.name} 的在线会话。` : `已登录角色 ${profile.name}。`,
+            login_mode: loginMode,
+            player: { id: profile.id, name: profile.name, sprite: profile.sprite, ...currentState, isThinking: false, message: null, presenceState: 'active' },
+            message: loginMode === 'spawn'
+              ? `已重新进入小镇，${profile.name} 已回到起点。`
+              : (previousToken ? `已接管角色 ${profile.name} 的在线会话。` : `已登录角色 ${profile.name}。`),
           }));
           return;
         }
@@ -117,8 +129,9 @@ function createMockServer() {
             return;
           }
           const session = tokens.get(auth);
+          const state = playerStates.get(session.id) || { x: 5, y: 5, zone: 'Town Center', zoneDesc: 'Central square' };
           res.end(JSON.stringify({
-            player: { x: 5, y: 5, zone: 'Town Center', zoneDesc: 'Central square', sprite: session.sprite, name: session.name },
+            player: { x: state.x, y: state.y, zone: state.zone, zoneDesc: state.zoneDesc, sprite: session.sprite, name: session.name },
             nearby: [{ name: 'Alice', distance: 2, relativeDirection: '左侧', zone: 'Town Center', message: 'hello' }],
           }));
           return;
@@ -130,8 +143,18 @@ function createMockServer() {
             res.end(JSON.stringify({ error: 'unauthorized' }));
             return;
           }
+          const session = tokens.get(auth);
+          const current = playerStates.get(session.id) || { x: 5, y: 5, direction: 'S', zone: 'Town Center', zoneDesc: 'Central square' };
+          const next = {
+            x: current.x + payload.steps,
+            y: current.y,
+            direction: payload.direction,
+            zone: 'Town Center',
+            zoneDesc: 'Central square',
+          };
+          playerStates.set(session.id, next);
           res.end(JSON.stringify({
-            player: { x: 7, y: 5, zone: 'Town Center', zoneDesc: 'Central square' },
+            player: { x: next.x, y: next.y, zone: next.zone, zoneDesc: next.zoneDesc },
             actualSteps: payload.steps,
             blocked: false,
           }));
@@ -235,7 +258,8 @@ describe('Town CLI (smoke)', () => {
     assert.match(look.stdout, /左侧/);
 
     const walk = await runCli(['walk', '--direction', 'E', '--steps', '2'], env);
-    assert.match(walk.stdout, /你试图向 E 走 2 步/);
+    assert.match(walk.stdout, /实际移动 2 步/);
+    assert.match(walk.stdout, /\(7, 5\)/);
 
     const say = await runCli(['say', '--text', '你好'], env);
     assert.match(say.stdout, /你说: 你好/);
@@ -247,6 +271,7 @@ describe('Town CLI (smoke)', () => {
     const reloginResult = JSON.parse(relogin.stdout);
     assert.equal(reloginResult.profile, loginResult.profile);
     assert.equal(reloginResult.handle, loginResult.handle);
+    assert.equal(reloginResult.login_mode, 'resume');
   });
 
   it('supports multiple local profiles and explicit profile switching', async () => {

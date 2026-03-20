@@ -16,7 +16,7 @@ async function walk(args) {
 
   const { auth, result } = await runAuthenticated('POST', '/api/walk', { direction, steps });
   if (!result) throwForAuth(auth);
-  console.log(formatWalk(direction, steps));
+  console.log(formatWalk(direction, steps, result));
 }
 
 async function say(args) {
