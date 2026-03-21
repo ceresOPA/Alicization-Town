@@ -33,6 +33,8 @@ const players = {};
 const chatHistory = [];
 const playerActivities = {};
 const events = new EventEmitter();
+const MAX_MEMORY_PARTICIPANTS = 3;
+const MAX_MEMORY_TEXT_LENGTH = 96;
 
 function deriveHandle(publicKey) {
   return `at_${crypto.createHash('sha256').update(publicKey).digest('hex').slice(0, 24)}`;
@@ -154,6 +156,128 @@ function addActivity(playerId, activity) {
   const player = players[playerId];
   if (player) {
     events.emit('activity', { id: playerId, name: player.name, sprite: player.sprite, activities: list });
+  }
+}
+
+function clampMemoryText(text, maxLength = MAX_MEMORY_TEXT_LENGTH) {
+  const normalized = String(text || '').replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, Math.max(0, maxLength - 3))}...`;
+}
+
+function formatParticipantNames(participants) {
+  if (!participants || participants.length === 0) return '';
+  if (participants.length === 1) return participants[0].name;
+  if (participants.length === 2) return `${participants[0].name} and ${participants[1].name}`;
+  return `${participants[0].name}, ${participants[1].name}, and ${participants.length - 2} others`;
+}
+
+function getNearbyParticipants(playerId, { limit = MAX_MEMORY_PARTICIPANTS, sameZoneOnly = false } = {}) {
+  const player = players[playerId];
+  if (!player) return [];
+  const result = [];
+  for (const [id, other] of Object.entries(players)) {
+    if (id === playerId || other.name === 'Observer') continue;
+    const distance = Math.abs(other.x - player.x) + Math.abs(other.y - player.y);
+    if (distance > NEARBY_RANGE) continue;
+    if (sameZoneOnly && other.currentZoneName !== player.currentZoneName) continue;
+    result.push({ ...other, distance });
+  }
+  result.sort((left, right) => left.distance - right.distance || left.name.localeCompare(right.name));
+  return result.slice(0, Math.max(0, limit));
+}
+
+function writeAgentMemory(agentId, { partnerId = null, location = null, kind = 'summary', content, metadata = null }) {
+  if (!agentId || !content) return null;
+  return sqliteStateStore.saveAgentMemory({
+    id: nextSnowflakeId(),
+    agentId,
+    partnerId,
+    location,
+    kind,
+    content: clampMemoryText(content),
+    metadata,
+  });
+}
+
+function recordSayMemories(playerId, text) {
+  const speaker = players[playerId];
+  if (!speaker) return;
+  const heardBy = getNearbyParticipants(playerId);
+  const quote = clampMemoryText(text, 72);
+  const location = speaker.currentZoneName || 'Town Street';
+  const heardByNames = formatParticipantNames(heardBy);
+
+  writeAgentMemory(playerId, {
+    partnerId: heardBy.length === 1 ? heardBy[0].id : null,
+    location,
+    kind: 'say',
+    content: heardBy.length > 0
+      ? `At ${location}, said "${quote}" near ${heardByNames}.`
+      : `At ${location}, said "${quote}".`,
+    metadata: {
+      eventType: 'say',
+      role: 'speaker',
+      participantIds: heardBy.map((participant) => participant.id),
+      participantCount: heardBy.length,
+    },
+  });
+
+  for (const listener of heardBy) {
+    writeAgentMemory(listener.id, {
+      partnerId: speaker.id,
+      location: listener.currentZoneName || location,
+      kind: 'heard',
+      content: `At ${listener.currentZoneName || location}, heard ${speaker.name} say "${quote}".`,
+      metadata: {
+        eventType: 'say',
+        role: 'listener',
+        actorId: speaker.id,
+        actorName: speaker.name,
+      },
+    });
+  }
+}
+
+function recordInteractionMemories(playerId, zoneName, result) {
+  const actor = players[playerId];
+  if (!actor) return;
+  const witnesses = getNearbyParticipants(playerId, { sameZoneOnly: true });
+  const location = zoneName || actor.currentZoneName || 'Town Street';
+  const actionText = clampMemoryText(result?.action || 'interacted here', 40);
+  const outcomeText = clampMemoryText(result?.result || 'Something happened.', 72);
+  const witnessNames = formatParticipantNames(witnesses);
+
+  writeAgentMemory(playerId, {
+    partnerId: witnesses.length === 1 ? witnesses[0].id : null,
+    location,
+    kind: 'interaction',
+    content: witnesses.length > 0
+      ? `At ${location}, did "${actionText}" near ${witnessNames}; outcome: ${outcomeText}`
+      : `At ${location}, did "${actionText}"; outcome: ${outcomeText}`,
+    metadata: {
+      eventType: 'interact',
+      role: 'actor',
+      participantIds: witnesses.map((participant) => participant.id),
+      participantCount: witnesses.length,
+      action: actionText,
+    },
+  });
+
+  for (const witness of witnesses) {
+    writeAgentMemory(witness.id, {
+      partnerId: actor.id,
+      location: witness.currentZoneName || location,
+      kind: 'witnessed_interaction',
+      content: `At ${witness.currentZoneName || location}, saw ${actor.name} do "${actionText}".`,
+      metadata: {
+        eventType: 'interact',
+        role: 'witness',
+        actorId: actor.id,
+        actorName: actor.name,
+        action: actionText,
+      },
+    });
   }
 }
 
@@ -421,6 +545,7 @@ function say(playerId, text) {
   touchAction(playerId);
   player.message = text;
   addChat(player.name, text);
+  recordSayMemories(playerId, text);
   addActivity(playerId, { type: 'say', text: `说: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"` });
   broadcast();
   setTimeout(() => {
@@ -438,6 +563,7 @@ function interact(playerId) {
   touchAction(playerId);
   const zone = getZoneAt(player.x, player.y);
   const result = getInteractionForZone(zone);
+  const zoneName = zone ? zone.name : '小镇街道';
   player.interactionText = result.action;
   player.interactionIcon = result.icon || '';
   player.interactionSound = result.sound || 'interact';
@@ -453,13 +579,14 @@ function interact(playerId) {
   const entry = {
     time: Date.now(),
     name: player.name,
-    zone: zone ? zone.name : '小镇街道',
+    zone: zoneName,
     action: result.action,
     result: result.result,
   };
   events.emit('interaction', entry);
   addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });
-  return { zone: zone ? zone.name : '小镇街道', ...result };
+  recordInteractionMemories(playerId, zoneName, result);
+  return { zone: zoneName, ...result };
 }
 
 function look(playerId) {
@@ -502,6 +629,28 @@ function setThinking(playerId, isThinking) {
   broadcast();
 }
 
+function recallMemories(playerId, { partnerId = null, location = null, since = null, limit = 4 } = {}) {
+  const player = players[playerId];
+  if (!player) return null;
+  const resolvedLocation = location || player.currentZoneName || null;
+  const memories = sqliteStateStore.retrieveAgentMemories({
+    agentId: playerId,
+    partnerId,
+    location: resolvedLocation,
+    since,
+    limit,
+  });
+  return memories.map((memory) => ({
+    id: memory.id,
+    partnerId: memory.partnerId,
+    location: memory.location,
+    kind: memory.kind,
+    content: memory.content,
+    createdAt: memory.createdAt,
+    retrievalScore: memory.retrievalScore,
+  }));
+}
+
 module.exports = {
   init,
   events,
@@ -521,6 +670,7 @@ module.exports = {
   look,
   readMap,
   setThinking,
+  recallMemories,
   touchAction,
   getMapDirectory: () => mapDirectory,
   getCharacterList: () => CHARACTER_SPRITES.slice(),

@@ -31,6 +31,8 @@ const {
   formatWalk,
   formatSay,
   formatInteract,
+  formatMemorySection,
+  appendMemorySection,
   parseFlags,
 } = require('./formatters');
 
@@ -62,5 +64,7 @@ module.exports = {
   formatWalk,
   formatSay,
   formatInteract,
+  formatMemorySection,
+  appendMemorySection,
   parseFlags,
 };

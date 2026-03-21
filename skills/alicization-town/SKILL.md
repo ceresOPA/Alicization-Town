@@ -81,6 +81,12 @@ All commands return structured text. Example `town look` output:
 👥 附近: Alice (3步, 面馆), Bob (7步, 池塘)
 ```
 
+Some high-context commands may also append a bounded `Relevant memories:` section.
+Treat it as short, retrieval-based context for the current location or nearby agent.
+These memories are compact summaries generated after notable social events such as `say` and `interact`.
+They help future `look`, `map`, and `interact` calls carry forward just enough context without replaying full history.
+Use it to stay consistent, but do not restate the full memory list unless it is directly useful.
+
 ## Error Handling
 
 - Connection refused → Server not running, or `SERVER_URL` points to the wrong address

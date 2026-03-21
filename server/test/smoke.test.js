@@ -15,6 +15,7 @@ process.env.ALICIZATION_TOWN_TOKEN_TTL_MS = '1000';
 const MAP_PATH = path.join(__dirname, '..', 'web', 'assets', 'map.tmj');
 const worldEngine = require('../src/engine/world-engine');
 const { describeRelativeDirection } = require('../src/engine/relative-direction');
+const { sqliteStateStore } = require('../src/persistence/sqlite-state-store');
 
 function request(method, apiPath, body, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -61,6 +62,41 @@ function generateAuthMaterial() {
 function signLogin(handle, privateJwk, timestamp) {
   const key = crypto.createPrivateKey({ key: privateJwk, format: 'jwk' });
   return crypto.sign(null, Buffer.from(`alicization-town:login:${handle}:${timestamp}`, 'utf8'), key).toString('base64url');
+}
+
+async function createAndLoginPlayer(name, sprite) {
+  const authMaterial = generateAuthMaterial();
+  const created = await request('POST', '/api/profiles/create', {
+    name,
+    sprite,
+    publicKey: authMaterial.publicJwk.x,
+  });
+  const timestamp = Date.now();
+  const login = await request('POST', '/api/login', {
+    handle: created.body.handle,
+    timestamp,
+    signature: signLogin(created.body.handle, authMaterial.privateJwk, timestamp),
+  });
+  return {
+    created,
+    login,
+    headers: { Authorization: `Bearer ${login.body.token}` },
+    authMaterial,
+  };
+}
+
+async function reloginPlayer(player) {
+  const timestamp = Date.now();
+  const login = await request('POST', '/api/login', {
+    handle: player.created.body.handle,
+    timestamp,
+    signature: signLogin(player.created.body.handle, player.authMaterial.privateJwk, timestamp),
+  });
+  return {
+    ...player,
+    login,
+    headers: { Authorization: `Bearer ${login.body.token}` },
+  };
 }
 
 describe('World Engine (unit)', () => {
@@ -120,7 +156,9 @@ describe('HTTP API (integration)', () => {
 
   after(() => {
     server?.close();
-    fs.rmSync(TEMP_HOME, { recursive: true, force: true });
+    try {
+      fs.rmSync(TEMP_HOME, { recursive: true, force: true });
+    } catch {}
   });
 
   it('GET /api/characters returns array', async () => {
@@ -175,6 +213,102 @@ describe('HTTP API (integration)', () => {
 
     const logout = await request('POST', '/api/logout', null, headers);
     assert.equal(logout.status, 200);
+  });
+
+  it('persists runtime memories for both actor and nearby participants', async () => {
+    let alice = await createAndLoginPlayer('MemoryAlice', 'Princess');
+    const bob = await createAndLoginPlayer('MemoryBob', 'Samurai');
+    alice = await reloginPlayer(alice);
+
+    const said = await request('POST', '/api/say', { text: 'Let us regroup by the noodle house.' }, alice.headers);
+    assert.equal(said.status, 200);
+
+    const interacted = await request('POST', '/api/interact', null, alice.headers);
+    assert.equal(interacted.status, 200);
+
+    const aliceMemories = sqliteStateStore.listAgentMemories(alice.login.body.player.id, { limit: 10 });
+    const bobMemories = sqliteStateStore.listAgentMemories(bob.login.body.player.id, { limit: 10 });
+
+    assert.ok(aliceMemories.some((memory) => memory.kind === 'say' && /noodle house/i.test(memory.content)));
+    assert.ok(aliceMemories.some((memory) => memory.kind === 'interaction'));
+    assert.ok(bobMemories.some((memory) => memory.kind === 'heard' && /MemoryAlice/.test(memory.content)));
+    assert.ok(bobMemories.some((memory) => memory.kind === 'witnessed_interaction' && /MemoryAlice/.test(memory.content)));
+  });
+
+  it('recalls bounded relevant memories by partner, location, and recency', async () => {
+    const alpha = await createAndLoginPlayer('RecallAlpha', 'Boy');
+    const beta = await createAndLoginPlayer('RecallBeta', 'Monk');
+    const gamma = await createAndLoginPlayer('RecallGamma', 'Princess');
+    const alphaId = alpha.login.body.player.id;
+    const betaId = beta.login.body.player.id;
+    const gammaId = gamma.login.body.player.id;
+    const location = alpha.login.body.player.zone;
+    const now = Date.now();
+
+    sqliteStateStore.saveAgentMemory({
+      id: 'memory-old-perfect',
+      agentId: alphaId,
+      partnerId: betaId,
+      location,
+      kind: 'summary',
+      content: 'Old perfect memory with beta in town.',
+      createdAt: now - 10_000,
+      updatedAt: now - 10_000,
+    });
+    sqliteStateStore.saveAgentMemory({
+      id: 'memory-recent-perfect',
+      agentId: alphaId,
+      partnerId: betaId,
+      location,
+      kind: 'summary',
+      content: 'Recent perfect memory with beta in town.',
+      createdAt: now - 100,
+      updatedAt: now - 100,
+    });
+    sqliteStateStore.saveAgentMemory({
+      id: 'memory-partner-only',
+      agentId: alphaId,
+      partnerId: betaId,
+      location: 'Forest',
+      kind: 'summary',
+      content: 'Partner-only memory with beta in forest.',
+      createdAt: now - 50,
+      updatedAt: now - 50,
+    });
+    sqliteStateStore.saveAgentMemory({
+      id: 'memory-location-only',
+      agentId: alphaId,
+      partnerId: gammaId,
+      location,
+      kind: 'summary',
+      content: 'Location-only memory with gamma in town.',
+      createdAt: now - 25,
+      updatedAt: now - 25,
+    });
+
+    const freshAlpha = await reloginPlayer(alpha);
+    const bounded = await request('POST', '/api/memories/recall', {
+      partnerId: betaId,
+      location,
+      since: now - 500,
+      limit: 2,
+    }, freshAlpha.headers);
+    assert.equal(bounded.status, 200);
+    assert.equal(bounded.body.memories.length, 2);
+    assert.deepEqual(
+      bounded.body.memories.map((memory) => memory.id),
+      ['memory-recent-perfect', 'memory-partner-only'],
+    );
+
+    const recentOnly = await request('POST', '/api/memories/recall', {
+      partnerId: betaId,
+      location,
+      since: now - 500,
+      limit: 5,
+    }, freshAlpha.headers);
+    assert.equal(recentOnly.status, 200);
+    assert.ok(recentOnly.body.memories.every((memory) => memory.createdAt >= now - 500));
+    assert.ok(!recentOnly.body.memories.some((memory) => memory.id === 'memory-old-perfect'));
   });
 
   it('new login takes over the old session', async () => {

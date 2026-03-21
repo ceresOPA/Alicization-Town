@@ -1,4 +1,4 @@
-const { runAuthenticated, formatWalk, formatSay, formatInteract, parseFlags } = require('./core');
+const { runAuthenticated, formatWalk, formatSay, formatInteract, appendMemorySection, parseFlags } = require('./core');
 
 function throwForAuth(auth) {
   if (!auth) return;
@@ -34,7 +34,15 @@ async function say(args) {
 async function interact() {
   const { auth, result } = await runAuthenticated('POST', '/api/interact');
   if (!result) throwForAuth(auth);
-  console.log(formatInteract(result));
+  let text = formatInteract(result);
+  const recalled = await runAuthenticated('POST', '/api/memories/recall', {
+    location: result.zone || null,
+    limit: 4,
+  });
+  if (recalled.result?.memories?.length) {
+    text = appendMemorySection(text, recalled.result.memories);
+  }
+  console.log(text);
 }
 
 module.exports = { walk, say, interact };

@@ -158,6 +158,19 @@ function createMockServer() {
           return;
         }
 
+        if (req.url === '/api/memories/recall' && req.method === 'POST') {
+          if (!auth || !tokens.has(auth)) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: 'unauthorized' }));
+            return;
+          }
+          const memories = payload.location === 'Town Center'
+            ? [{ id: 'cli-town', content: 'You recently coordinated with someone in Town Center.' }]
+            : [{ id: 'cli-general', content: 'You remember the town rewards revisiting important places.' }];
+          res.end(JSON.stringify({ memories: memories.slice(0, payload.limit || memories.length) }));
+          return;
+        }
+
         if (req.url === '/api/logout' && req.method === 'POST') {
           if (auth) tokens.delete(auth);
           res.end(JSON.stringify({ ok: true }));
@@ -228,10 +241,12 @@ describe('Town CLI (smoke)', () => {
 
     const map = await runCli(['map'], env);
     assert.match(map.stdout, /Town Center/);
+    assert.match(map.stdout, /Relevant memories/);
 
     const look = await runCli(['look'], env);
     assert.match(look.stdout, /位置感知/);
     assert.match(look.stdout, /Alice/);
+    assert.match(look.stdout, /Relevant memories/);
     assert.match(look.stdout, /左侧/);
 
     const walk = await runCli(['walk', '--direction', 'E', '--steps', '2'], env);
@@ -241,6 +256,7 @@ describe('Town CLI (smoke)', () => {
     assert.match(say.stdout, /你说: 你好/);
 
     const interact = await runCli(['interact'], env);
+    assert.match(interact.stdout, /Relevant memories/);
     assert.match(interact.stdout, /互动/);
 
     const relogin = await runCli(['login', '--profile', loginResult.profile], env);

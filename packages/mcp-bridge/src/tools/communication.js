@@ -33,7 +33,14 @@ async function handle(name, args, client) {
     if (!result) {
       return { content: [{ type: 'text', text: auth?.message || '当前还没有可用 profile，请先 login。' }] };
     }
-    return { content: [{ type: 'text', text: client.formatLook(result) }] };
+    return {
+      content: [{ type: 'text', text: client.formatLook(result) }],
+      memoryContext: {
+        location: result.player?.zone || null,
+        partnerId: result.nearby?.[0]?.id || null,
+        limit: 4,
+      },
+    };
   }
 
   return null;

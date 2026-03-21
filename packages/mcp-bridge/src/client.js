@@ -95,6 +95,13 @@ async function interact() {
   return { auth, result };
 }
 
+async function recallMemories(options = {}) {
+  const { auth, result, profile } = await activeHandle.request('POST', '/api/memories/recall', options);
+  if (profile?.profile) setActiveProfileName(profile.profile);
+  if (profile) startHeartbeatLoop();
+  return { auth, result: result ? result.memories || [] : null };
+}
+
 async function setThinking(isThinking) {
   const { profile } = await activeHandle.request('PUT', '/api/status', { isThinking });
   if (profile?.profile) setActiveProfileName(profile.profile);
@@ -112,6 +119,7 @@ module.exports = {
   walk,
   say,
   interact,
+  recallMemories,
   setThinking,
   formatLogin: townClient.formatLogin,
   formatProfilesList: townClient.formatProfilesList,
@@ -121,4 +129,5 @@ module.exports = {
   formatWalk: townClient.formatWalk,
   formatSay: townClient.formatSay,
   formatInteract: townClient.formatInteract,
+  appendMemorySection: townClient.appendMemorySection,
 };

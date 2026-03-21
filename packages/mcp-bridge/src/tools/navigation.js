@@ -13,7 +13,10 @@ async function handle(name, _args, client) {
   if (!result) {
     return { content: [{ type: 'text', text: auth?.message || '当前还没有可用 profile，请先 login。' }] };
   }
-  return { content: [{ type: 'text', text: client.formatMap(result) }] };
+  return {
+    content: [{ type: 'text', text: client.formatMap(result) }],
+    memoryContext: { limit: 3 },
+  };
 }
 
 module.exports = { definitions, handle };

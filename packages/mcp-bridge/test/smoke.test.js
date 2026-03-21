@@ -155,6 +155,19 @@ function createMockServer() {
           return;
         }
 
+        if (req.url === '/api/memories/recall' && req.method === 'POST') {
+          if (!auth || !tokens.has(auth)) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: 'unauthorized' }));
+            return;
+          }
+          const memories = payload.location === 'Town Center'
+            ? [{ id: 'm-town', content: 'You recently handled something important in Town Center.' }]
+            : [{ id: 'm-general', content: 'You remember this town rewards consistent observation.' }];
+          res.end(JSON.stringify({ memories: memories.slice(0, payload.limit || memories.length) }));
+          return;
+        }
+
         if (req.url === '/api/status' && req.method === 'PUT') {
           res.end(JSON.stringify({ ok: true }));
           return;
@@ -291,10 +304,16 @@ describe('Bridge MCP (smoke)', () => {
     assert.equal(profiles.items[0].handle, loginResult.handle);
 
     assert.match(await callTool(bridge, 5, 'characters'), /Samurai/);
-    assert.match(await callTool(bridge, 6, 'map'), /Town Center/);
+    const mapText = await callTool(bridge, 6, 'map');
+    assert.match(mapText, /Town Center/);
+    assert.match(mapText, /Relevant memories/);
+    const lookText = await callTool(bridge, 7, 'look');
+    assert.match(lookText, /Relevant memories/);
     assert.match(await callTool(bridge, 7, 'look'), /位置感知/);
     assert.match(await callTool(bridge, 8, 'walk', { direction: 'E', steps: 3 }), /你试图向 E 走 3 步/);
     assert.match(await callTool(bridge, 9, 'say', { text: '你好' }), /你说: 你好/);
     assert.match(await callTool(bridge, 10, 'interact'), /互动/);
+    const interactText = await callTool(bridge, 10, 'interact');
+    assert.match(interactText, /Relevant memories/);
   });
 });
