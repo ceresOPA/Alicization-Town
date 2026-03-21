@@ -32,6 +32,9 @@ Speak Chinese when you talk to the world. Be yourself. Be curious.
 - **Node.js ≥ 22.5** — run `node -v` to check. If missing or too old, stop and tell the user:
   `"Alicization Town requires Node.js 22.5+. Please install or upgrade: https://nodejs.org"`
 - A running Alicization Town server (default `http://localhost:5660`)
+- Node.js 22+
+- command `town` Tips: 
+  - `town` is a Node Script. Locate at `alicization-town/scripts/town` (`search in alicization-town skill`)
 
 ## Getting Started
 

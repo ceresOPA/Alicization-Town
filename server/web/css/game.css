@@ -13,7 +13,8 @@
     #page-wrapper { display: inline-block; }
     #main-layout { display: flex; gap: 10px; align-items: stretch; }
     #game-container { position: relative; display: inline-block; flex-shrink: 0; }
-    #gameCanvas {
+    #side-panel { width: 280px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; max-height: 612px; overflow: hidden; }
+    canvas {
       background-color: #a4d460; border: 6px solid #c8a165; border-radius: 10px;
       box-shadow: 0 8px 20px rgba(0,0,0,0.4); image-rendering: pixelated; cursor: grab;
     }
@@ -208,7 +209,7 @@
       .zoom-btn { width: 44px; height: 44px; }
       .zoom-btn svg { width: 22px; height: 22px; }
       #ai-panel-container { max-height: 180px; }
-      #chatlog-container { min-height: 150px; max-height: 250px; }
+      #chatlog-container { width: 100%; max-width: 600px; min-height: 150px; max-height: 250px; }
     }
 
     @media (max-width: 480px) {
