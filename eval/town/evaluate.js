@@ -400,6 +400,7 @@ function ensureTownCliBuilt(runRoot) {
     cwd: ROOT,
     encoding: 'utf8',
     env: process.env,
+    shell: true,
   });
 
   if (result.status !== 0) {
