@@ -51,6 +51,15 @@ class SQLiteStateStore {
     if (!columns.has('public_key')) {
       this.database.exec(`ALTER TABLE profiles ADD COLUMN public_key TEXT;`);
     }
+    if (!columns.has('last_x')) {
+      this.database.exec(`ALTER TABLE profiles ADD COLUMN last_x INTEGER;`);
+    }
+    if (!columns.has('last_y')) {
+      this.database.exec(`ALTER TABLE profiles ADD COLUMN last_y INTEGER;`);
+    }
+    if (!columns.has('last_direction')) {
+      this.database.exec(`ALTER TABLE profiles ADD COLUMN last_direction TEXT;`);
+    }
 
     this.database.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_handle ON profiles(handle);
@@ -87,7 +96,8 @@ class SQLiteStateStore {
 
   getProfile(id) {
     const row = this.database.prepare(`
-      SELECT id, handle, name, sprite, public_key AS publicKey, created_at AS createdAt, last_used_at AS lastUsedAt
+      SELECT id, handle, name, sprite, public_key AS publicKey, created_at AS createdAt, last_used_at AS lastUsedAt,
+        last_x AS lastX, last_y AS lastY, last_direction AS lastDirection
       FROM profiles
       WHERE id = ?
     `).get(id);
@@ -96,7 +106,8 @@ class SQLiteStateStore {
 
   getProfileByHandle(handle) {
     const row = this.database.prepare(`
-      SELECT id, handle, name, sprite, public_key AS publicKey, created_at AS createdAt, last_used_at AS lastUsedAt
+      SELECT id, handle, name, sprite, public_key AS publicKey, created_at AS createdAt, last_used_at AS lastUsedAt,
+        last_x AS lastX, last_y AS lastY, last_direction AS lastDirection
       FROM profiles
       WHERE handle = ?
     `).get(handle);
@@ -105,7 +116,8 @@ class SQLiteStateStore {
 
   getProfileByPublicKey(publicKey) {
     const row = this.database.prepare(`
-      SELECT id, handle, name, sprite, public_key AS publicKey, created_at AS createdAt, last_used_at AS lastUsedAt
+      SELECT id, handle, name, sprite, public_key AS publicKey, created_at AS createdAt, last_used_at AS lastUsedAt,
+        last_x AS lastX, last_y AS lastY, last_direction AS lastDirection
       FROM profiles
       WHERE public_key = ?
     `).get(publicKey);
@@ -126,6 +138,14 @@ class SQLiteStateStore {
       SET sprite = ?
       WHERE id = ?
     `).run(sprite, id);
+  }
+
+  updateProfilePosition(id, { x, y, direction }) {
+    this.database.prepare(`
+      UPDATE profiles
+      SET last_x = ?, last_y = ?, last_direction = ?
+      WHERE id = ?
+    `).run(x, y, direction || null, id);
   }
 
   saveAuthSession(session) {

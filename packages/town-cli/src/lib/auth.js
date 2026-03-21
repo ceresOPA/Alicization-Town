@@ -7,6 +7,8 @@ async function loginCommand(args) {
     create: Boolean(flags.create),
     name: flags.name,
     sprite: flags.sprite,
+    loginMode: flags['login-mode'],
+    respawn: Boolean(flags.respawn),
   });
   console.log(formatLogin(result));
 }

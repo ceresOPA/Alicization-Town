@@ -9,6 +9,8 @@ const definitions = [
         create: { type: 'boolean', description: '是否进入创建模式' },
         name: { type: 'string', description: '创建模式下的新角色名字' },
         sprite: { type: 'string', description: '创建模式下使用的角色外观' },
+        loginMode: { type: 'string', enum: ['resume', 'spawn'], description: '登录方式：resume 恢复原地，spawn 回到起点' },
+        respawn: { type: 'boolean', description: '是否显式回到起点重新入镇；等价于 loginMode=spawn' },
       },
     },
     annotations: { title: 'Login', readOnlyHint: false, destructiveHint: false, openWorldHint: false },

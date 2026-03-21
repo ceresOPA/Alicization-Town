@@ -61,8 +61,14 @@ function formatLook(result) {
   return info.trimEnd();
 }
 
-function formatWalk(direction, steps) {
-  return `你试图向 ${direction} 走 ${steps} 步。请用 look 确认是否到达，或是否撞墙。`;
+function formatWalk(direction, steps, result = null) {
+  if (!result || !result.player) {
+    return `你试图向 ${direction} 走 ${steps} 步。请用 look 确认是否到达，或是否撞墙。`;
+  }
+
+  const actual = Number.isFinite(result.actualSteps) ? result.actualSteps : 0;
+  const blockedText = result.blocked ? '，前方受阻' : '';
+  return `你向 ${direction} 走了 ${steps} 步，实际移动 ${actual} 步${blockedText}。当前位置: (${result.player.x}, ${result.player.y})，地点: ${result.player.zone}。`;
 }
 
 function formatSay(text) {

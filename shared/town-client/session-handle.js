@@ -72,7 +72,7 @@ class SessionHandle {
         sprite: options.sprite,
         server: options.server,
       });
-      const createdLogin = await loginWithProfile(createdProfile);
+      const createdLogin = await loginWithProfile(createdProfile, options);
       this.profileName = createdProfile.profile;
       return {
         ...createdLogin,
@@ -97,7 +97,7 @@ class SessionHandle {
 
     const profile = this.getProfileOrThrow(resolvedProfile);
     this.profileName = resolvedProfile;
-    return loginWithProfile(profile);
+    return loginWithProfile(profile, options);
   }
 
   async heartbeat() {

@@ -43,7 +43,7 @@ async function main() {
 用法: node town <command> [args...]
 
 身份:
-  login [--profile <PROFILE>] [--create --name <NAME> --sprite <SPRITE>]
+  login [--profile <PROFILE>] [--create --name <NAME> --sprite <SPRITE>] [--login-mode <resume|spawn>] [--respawn]
   list-profile
 
 查询:
