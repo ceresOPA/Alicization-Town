@@ -6,6 +6,8 @@ const path = require('path');
 const worldEngine = require('./engine/world-engine');
 const apiRouter = require('./routes');
 
+const { NpcManager } = require('./npc/npc-manager');
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -68,3 +70,16 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => console.log(`🌍 Underworld 已启动: http://localhost:${PORT}`));
+
+// ── 初始化 NPC 常驻系统 ─────────────────────────────────────────────────────
+const npcManager = new NpcManager(worldEngine);
+npcManager.start();
+app.locals.npcManager = npcManager;
+
+// ── 优雅关闭：清理 NPC ──────────────────────────────────────────────────────
+function gracefulShutdown() {
+  npcManager.stop();
+  server.close();
+}
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

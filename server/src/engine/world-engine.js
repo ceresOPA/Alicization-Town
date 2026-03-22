@@ -134,6 +134,7 @@ function sanitize(player) {
     zone: player.currentZoneName,
     zoneDesc: player.currentZoneDesc,
     isThinking: player.isThinking,
+    isNPC: player.isNPC || false,
     message: player.message || null,
     lastActionAt: player.lastActionAt || null,
     lastHeartbeatAt: player.lastHeartbeatAt || null,

@@ -46,6 +46,7 @@ router.get('/players', (_req, res) => {
       zone: player.currentZoneName,
       sprite: player.sprite,
       isThinking: player.isThinking,
+      isNPC: player.isNPC || false,
       message: player.message || '',
       lastActionAt: player.lastActionAt || null,
       lastHeartbeatAt: player.lastHeartbeatAt || null,
@@ -128,6 +129,12 @@ router.put('/status', requireSession, (req, res) => {
 
 router.get('/perceptions', requireSession, (req, res) => {
   res.json({ perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
+});
+
+router.get('/npcs', (req, res) => {
+  const npcManager = req.app.locals.npcManager;
+  if (!npcManager) return res.json({ npcs: [] });
+  res.json({ npcs: npcManager.getNpcList() });
 });
 
 function parseChatCursor(rawCursor) {
