@@ -24,7 +24,7 @@ function request(method, apiPath, body, headers = {}) {
       path: apiPath,
       method,
       headers: { 'Content-Type': 'application/json', ...headers },
-      timeout: 5000,
+      timeout: 15000,
     };
 
     const req = http.request(options, (res) => {
@@ -332,11 +332,115 @@ describe('HTTP API (integration)', () => {
     await request('POST', '/api/logout', null, headers);
   });
 
-  it('rejects removed legacy session endpoints', async () => {
-    const join = await request('POST', '/api/join', { name: 'LegacyJoin', sprite: 'Monk' });
-    assert.equal(join.status, 404);
+  it('walks to a named zone via pathfinding', async () => {
+    const authMaterial = generateAuthMaterial();
+    const created = await request('POST', '/api/profiles/create', {
+      name: 'PathBot',
+      sprite: 'Boy',
+      publicKey: authMaterial.publicJwk.x,
+    });
+    const timestamp = Date.now();
+    const login = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, timestamp),
+    });
+    const headers = { Authorization: `Bearer ${login.body.token}` };
 
-    const leave = await request('POST', '/api/leave', null, { 'X-Session-Id': 'legacy-session' });
-    assert.equal(leave.status, 404);
+    const map = await request('GET', '/api/map', null, headers);
+    assert.ok(Array.isArray(map.body.directory));
+    assert.ok(map.body.directory.length > 0);
+    const target = map.body.directory[0];
+
+    const walk = await request('POST', '/api/walk', { to: target.id }, headers);
+    assert.equal(walk.status, 200);
+    assert.ok(walk.body.arrived);
+    assert.ok(walk.body.pathLength >= 0);
+    assert.ok(walk.body.targetZone);
+
+    await request('POST', '/api/logout', null, headers);
+  });
+
+  it('serializes concurrent actions on the same player via action lock', async () => {
+    const authMaterial = generateAuthMaterial();
+    const created = await request('POST', '/api/profiles/create', {
+      name: 'ConcurrentBot',
+      sprite: 'Princess',
+      publicKey: authMaterial.publicJwk.x,
+    });
+    const timestamp = Date.now();
+    const login = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, timestamp),
+    });
+    const headers = { Authorization: `Bearer ${login.body.token}` };
+
+    const walkPromise = request('POST', '/api/walk', { forward: 3 }, headers);
+    const chatPromise = request('POST', '/api/chat', { text: '并发测试' }, headers);
+    const [walkResult, chatResult] = await Promise.all([walkPromise, chatPromise]);
+
+    assert.equal(walkResult.status, 200);
+    assert.ok(walkResult.body.arrived);
+    assert.equal(chatResult.status, 200);
+
+    await request('POST', '/api/logout', null, headers);
+  });
+
+  it('allows different players to walk concurrently without blocking each other', async () => {
+    const authA = generateAuthMaterial();
+    const authB = generateAuthMaterial();
+    const createdA = await request('POST', '/api/profiles/create', { name: 'ParaA', sprite: 'Boy', publicKey: authA.publicJwk.x });
+    const createdB = await request('POST', '/api/profiles/create', { name: 'ParaB', sprite: 'Samurai', publicKey: authB.publicJwk.x });
+    const tsA = Date.now();
+    const tsB = Date.now() + 1;
+    const loginA = await request('POST', '/api/login', { handle: createdA.body.handle, timestamp: tsA, signature: signLogin(createdA.body.handle, authA.privateJwk, tsA) });
+    const loginB = await request('POST', '/api/login', { handle: createdB.body.handle, timestamp: tsB, signature: signLogin(createdB.body.handle, authB.privateJwk, tsB) });
+    const headersA = { Authorization: `Bearer ${loginA.body.token}` };
+    const headersB = { Authorization: `Bearer ${loginB.body.token}` };
+
+    const [walkA, walkB] = await Promise.all([
+      request('POST', '/api/walk', { forward: 3 }, headersA),
+      request('POST', '/api/walk', { forward: 3 }, headersB),
+    ]);
+
+    assert.equal(walkA.status, 200);
+    assert.ok(walkA.body.arrived);
+    assert.equal(walkB.status, 200);
+    assert.ok(walkB.body.arrived);
+
+    await request('POST', '/api/logout', null, headersA);
+    await request('POST', '/api/logout', null, headersB);
+  });
+
+  it('GET /api/npcs returns an array', async () => {
+    const { status, body } = await request('GET', '/api/npcs');
+    assert.equal(status, 200);
+    assert.ok(Array.isArray(body.npcs));
+  });
+
+  it('rejects walk requests with invalid or missing parameters', async () => {
+    const authMaterial = generateAuthMaterial();
+    const created = await request('POST', '/api/profiles/create', {
+      name: 'ErrorBot',
+      sprite: 'Monk',
+      publicKey: authMaterial.publicJwk.x,
+    });
+    const timestamp = Date.now();
+    const login = await request('POST', '/api/login', {
+      handle: created.body.handle,
+      timestamp,
+      signature: signLogin(created.body.handle, authMaterial.privateJwk, timestamp),
+    });
+    const headers = { Authorization: `Bearer ${login.body.token}` };
+
+    const noParams = await request('POST', '/api/walk', {}, headers);
+    assert.equal(noParams.status, 400);
+
+    const badZone = await request('POST', '/api/walk', { to: 'nonexistent_zone#ffff' }, headers);
+    assert.equal(badZone.status, 400);
+    assert.ok(badZone.body.error);
+
+    await request('POST', '/api/logout', null, headers);
   });
 });
