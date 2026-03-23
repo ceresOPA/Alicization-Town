@@ -35,11 +35,12 @@ function formatMap(directory) {
     return '小镇目前没有任何标记的特殊区域。';
   }
 
-  let info = '📜 【旅游指南】以下是小镇中所有重要地点及其中心坐标：\n\n';
+  let info = '📜 【旅游指南】以下是小镇中可前往的地点：\n\n';
   directory.forEach((place) => {
-    info += `🔹 [${place.name}] -> 坐标: (${place.x}, ${place.y})\n   说明: ${place.description}\n`;
+    info += `🔹 [${place.id}] ${place.name} -> 坐标: (${place.x}, ${place.y})\n   说明: ${place.description}\n`;
   });
-  info += '\n💡 提示: 使用 walk 工具前往你想去的地方。';
+  const exampleId = directory[0]?.id || 'restaurant#20de';
+  info += `\n💡 使用 walk --to "${exampleId}" 前往目标地点（必须使用上方列出的精确 id）。`;
   return info;
 }
 
@@ -68,8 +69,17 @@ function formatLook(result) {
   return info.trimEnd();
 }
 
-function formatWalk(direction, steps) {
-  return `你试图向 ${direction} 走 ${steps} 步。请用 look 确认是否到达，或是否撞墙。`;
+function formatWalk(result) {
+  const { player, pathLength, wasBlocked, targetZone } = result;
+  let info = '';
+  if (wasBlocked) {
+    info += `⚠️ 目标确切位置被阻挡，已到达最近的可通行位置。\n`;
+  }
+  info += `📍 已到达 (${player.x}, ${player.y})`;
+  if (targetZone) info += ` — ${targetZone}`;
+  if (player.zone) info += `\n📌 当前区域: ${player.zone}`;
+  info += `\n🚶 路径长度: ${pathLength} 步`;
+  return info;
 }
 
 function formatChatSend(text) {

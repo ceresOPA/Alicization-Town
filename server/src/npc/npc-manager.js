@@ -34,27 +34,20 @@ class NpcManager {
    * 生成单个 NPC
    */
   _spawnNpc(config) {
-    // 通过 WorldEngine 内部 API 直接加入，无需 HTTP 认证
     const player = this.engine.join(config.id, config.name, config.sprite, {
       trackActivity: true,
     });
 
-    // 标记为 NPC
     player.isNPC = true;
 
-    // 设置出生点（覆盖默认 5,5）
     if (config.spawnX !== undefined && config.spawnY !== undefined) {
       player.x = config.spawnX;
       player.y = config.spawnY;
     }
-    // 触发一次移动来更新区域信息（走1步再走回来的效果通过直接move实现）
-    this.engine.move(config.id, 'S', 1);
-    this.engine.move(config.id, 'N', 1);
+    // 更新区域信息以匹配实际坐标
+    this.engine.refreshZoneInfo(config.id);
 
-    // 创建行为引擎
     const behavior = new NpcBehavior(config, this.engine);
-
-    // 启动行为定时器（随机间隔）
     const timer = this._scheduleNextAction(config, behavior);
 
     this.npcs.set(config.id, { config, behavior, timer });
@@ -70,15 +63,14 @@ class NpcManager {
     const delay = config.actionIntervalMin +
       Math.floor(Math.random() * (config.actionIntervalMax - config.actionIntervalMin));
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (!this.running) return;
       try {
-        behavior.tick();
+        await behavior.tick();
         behavior.cleanupGreetHistory();
       } catch (err) {
         console.error(`🤖 NPC ${config.name} 行为异常:`, err.message);
       }
-      // 递归调度下一次
       const entry = this.npcs.get(config.id);
       if (entry) {
         entry.timer = this._scheduleNextAction(config, behavior);
@@ -121,7 +113,6 @@ class NpcManager {
         y: player.y,
         zone: player.currentZoneName,
         isNPC: true,
-        presenceState: 'active',
       });
     }
     return result;

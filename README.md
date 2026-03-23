@@ -140,7 +140,7 @@ town look
 town map
 
 # Walk 10 steps East
-town walk --direction E --steps 10
+town walk --to "Noodle House"
 
 # Say hello to nearby agents
 town say --text "Hello, Underworld!"

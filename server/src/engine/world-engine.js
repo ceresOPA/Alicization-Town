@@ -5,10 +5,11 @@ const { EventEmitter } = require('events');
 const { ZONE_INTERACTIONS, ZONE_CATEGORY_MAP } = require('../data/interactions');
 const { CHARACTER_SPRITES } = require('../data/characters');
 const { describeRelativeDirection } = require('./relative-direction');
+const { findPath, findNearestWalkable } = require('./pathfinding');
+const actionLock = require('./action-lock');
 const {
   MESSAGE_TTL_MS,
   INTERACTION_TTL_MS,
-  MAX_STEPS,
   NEARBY_RANGE,
   MAX_CHAT_MESSAGES,
   MAX_PLAYER_ACTIVITIES,
@@ -26,6 +27,7 @@ let worldMap = null;
 let collisionMap = [];
 let semanticZones = [];
 let mapDirectory = [];
+const MOVE_TICK_MS = 120;
 let nextSpriteIndex = 0;
 let lastSnowflakeTimestamp = 0;
 let snowflakeSequence = 0;
@@ -64,12 +66,47 @@ function init(mapPath) {
     console.log(`🗺️ 成功加载 ${semanticZones.length} 个语义区域`);
   }
 
-  mapDirectory = semanticZones.map((zone) => ({
-    name: zone.name,
-    x: Math.floor((zone.x + zone.width / 2) / worldMap.tilewidth),
-    y: Math.floor((zone.y + zone.height / 2) / worldMap.tileheight),
-    description: zone.properties?.find((prop) => prop.name === 'description')?.value || '',
-  }));
+  const NAVIGABLE_TYPES = new Set(['building', 'landmark']);
+  const usedIds = new Set();
+  mapDirectory = semanticZones.map((zone) => {
+    const normalizedName = (zone.name || '').toLowerCase();
+    let category = null;
+    let interactionType = null;
+    for (const [matcher, matchedCategory] of ZONE_CATEGORY_MAP) {
+      if (matcher.test(normalizedName)) {
+        category = matchedCategory;
+        break;
+      }
+    }
+    for (const type of Object.keys(ZONE_INTERACTIONS)) {
+      if (ZONE_INTERACTIONS[type][category]) {
+        interactionType = type;
+        break;
+      }
+    }
+    const navigable = interactionType ? NAVIGABLE_TYPES.has(interactionType) : false;
+    const base = category || normalizedName.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    const gridX = Math.floor((zone.x + zone.width / 2) / worldMap.tilewidth);
+    const gridY = Math.floor((zone.y + zone.height / 2) / worldMap.tileheight);
+    // Deterministic 4-char hex hash from name + position
+    const seed = `${zone.name}:${gridX}:${gridY}`;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+    const suffix = ((hash >>> 0) % 0xFFFF).toString(16).padStart(4, '0');
+    let id = `${base}#${suffix}`;
+    // Collision guard (extremely unlikely but safe)
+    while (usedIds.has(id)) id = `${base}#${(parseInt(id.split('#')[1], 16) + 1).toString(16).padStart(4, '0')}`;
+    usedIds.add(id);
+
+    return {
+      id,
+      name: zone.name,
+      navigable,
+      x: gridX,
+      y: gridY,
+      description: zone.properties?.find((prop) => prop.name === 'description')?.value || '',
+    };
+  });
 }
 
 function getZoneAt(gridX, gridY) {
@@ -260,6 +297,7 @@ function loginProfile(handle, timestamp, signature) {
   const previousToken = sqliteStateStore.getActiveToken(profile.id);
   const hadActiveSession = Boolean(previousToken && sqliteStateStore.getAuthSession(previousToken));
   if (previousToken) destroyToken(previousToken, { evictPlayer: true });
+  sqliteStateStore.clearActiveToken(profile.id);
 
   const token = crypto.randomUUID();
   const now = Date.now();
@@ -296,15 +334,20 @@ function getTokenSession(token, { touchLease = false } = {}) {
   const session = sqliteStateStore.getAuthSession(token);
   if (!session) return null;
   const now = Date.now();
-  // Token validity: only expiresAt matters (24h TTL)
   if (session.expiresAt <= now) {
     destroyToken(token);
     return null;
   }
-  // Lease is for presence display only; renew on any authenticated action
   if (touchLease) {
     session.leaseExpiresAt = now + LEASE_TTL_MS;
     sqliteStateStore.saveAuthSession(session);
+    // Auto-rejoin if player was ghost-cleaned but token is still valid
+    if (!players[session.id]) {
+      const profile = sqliteStateStore.getProfile(session.id);
+      if (profile) {
+        join(profile.id, profile.name, profile.sprite, { trackActivity: true });
+      }
+    }
     touchHeartbeat(session.id);
   }
   return session;
@@ -335,16 +378,25 @@ function pruneExpiredSessions() {
     destroyToken(token);
   }
 
+  // Remove non-NPC players whose heartbeat lease has expired (ghost cleanup)
+  let changed = false;
   for (const playerId of Object.keys(players)) {
     const player = players[playerId];
-    if (player && getPresenceState(player) === 'idle') {
-      broadcast();
+    if (!player || player.isNPC) continue;
+    if (getPresenceState(player) === 'offline') {
+      _removePlayerSilent(playerId);
+      changed = true;
     }
   }
+  if (changed) broadcast();
 }
 
 const cleanupTimer = setInterval(pruneExpiredSessions, 1_000);
 if (typeof cleanupTimer.unref === 'function') cleanupTimer.unref();
+
+function shutdown() {
+  clearInterval(cleanupTimer);
+}
 
 function emitPerception(type, playerId, playerName, x, y, data = {}) {
   perception.onWorldEvent({ type, playerId, playerName, position: { x, y }, data }, players);
@@ -385,13 +437,25 @@ function join(playerId, name, sprite, options = {}) {
   return players[playerId];
 }
 
-function removePlayer(playerId) {
+function _removePlayerSilent(playerId) {
   const player = players[playerId];
   if (!player) return;
   emitPerception('leave', playerId, player.name, player.x, player.y);
   delete players[playerId];
   delete playerActivities[playerId];
   perception.cleanup(playerId);
+  actionLock.remove(playerId);
+}
+
+function removePlayer(playerId) {
+  _removePlayerSilent(playerId);
+  broadcast();
+}
+
+function refreshZoneInfo(playerId) {
+  const player = players[playerId];
+  if (!player) return;
+  zoneInfo(player);
   broadcast();
 }
 
@@ -409,36 +473,108 @@ function touchAction(playerId) {
   player.lastHeartbeatAt = now;
 }
 
-function move(playerId, direction, steps) {
+function relativeToAbsolute(facing, forward, right, originX, originY) {
+  const fwd = forward || 0;
+  const rgt = right || 0;
+  // facing → (forwardDx, forwardDy, rightDx, rightDy)
+  switch (facing) {
+    case 'N': return { x: originX + rgt, y: originY - fwd };
+    case 'S': return { x: originX - rgt, y: originY + fwd };
+    case 'E': return { x: originX + fwd, y: originY + rgt };
+    case 'W': return { x: originX - fwd, y: originY - rgt };
+    default:  return { x: originX - rgt, y: originY + fwd };
+  }
+}
+
+function resolveTarget({ to, x, y, forward, right }, player) {
+  if (typeof x === 'number' && typeof y === 'number') {
+    return { targetX: Math.floor(x), targetY: Math.floor(y), resolvedZone: null };
+  }
+  if (typeof to === 'string' && to.length > 0) {
+    const nav = mapDirectory.filter((z) => z.navigable);
+    const zone = nav.find((z) => z.id === to.trim().toLowerCase());
+    if (zone) return { targetX: zone.x, targetY: zone.y, resolvedZone: zone.name };
+    const validIds = nav.map((z) => z.id).join(', ');
+    return { error: `未知地点: "${to}"。请使用 map 获取的精确 id。可用: ${validIds}` };
+  }
+  if ((typeof forward === 'number' || typeof right === 'number') && player) {
+    const abs = relativeToAbsolute(player.lastDirection, forward || 0, right || 0, player.x, player.y);
+    return { targetX: abs.x, targetY: abs.y, resolvedZone: null };
+  }
+  return { error: '需要指定目标: --to <id> 或 --x <X> --y <Y> 或 --forward/--right <步数>' };
+}
+
+function directionFromDelta(dx, dy) {
+  if (Math.abs(dx) >= Math.abs(dy)) return dx >= 0 ? 'E' : 'W';
+  return dy >= 0 ? 'S' : 'N';
+}
+
+async function move(playerId, target) {
   const player = players[playerId];
   if (!player) return null;
   touchAction(playerId);
-  player.lastDirection = direction;
-  const clamped = Math.max(1, Math.min(steps, MAX_STEPS));
-  const dx = direction === 'E' ? 1 : direction === 'W' ? -1 : 0;
-  const dy = direction === 'S' ? 1 : direction === 'N' ? -1 : 0;
-  let actual = 0;
-  let blocked = false;
-  for (let index = 0; index < clamped; index += 1) {
-    const nx = player.x + dx;
-    const ny = player.y + dy;
-    if (nx < 0 || nx >= worldMap.width || ny < 0 || ny >= worldMap.height) {
-      blocked = true;
-      break;
-    }
-    if (collisionMap[ny * worldMap.width + nx] === 1) {
-      blocked = true;
-      break;
-    }
-    player.x = nx;
-    player.y = ny;
-    actual += 1;
+
+  const resolved = resolveTarget(target, player);
+  if (resolved.error) return { error: resolved.error };
+
+  let { targetX, targetY } = resolved;
+  const { resolvedZone } = resolved;
+  let wasBlocked = false;
+
+  // If the exact target is blocked, find nearest walkable tile
+  if (targetX < 0 || targetX >= worldMap.width || targetY < 0 || targetY >= worldMap.height
+      || collisionMap[targetY * worldMap.width + targetX] === 1) {
+    const nearest = findNearestWalkable(collisionMap, worldMap.width, worldMap.height, targetX, targetY);
+    if (!nearest) return { error: '目标位置完全不可达。' };
+    wasBlocked = true;
+    targetX = nearest.x;
+    targetY = nearest.y;
   }
+
+  // Already at target
+  if (player.x === targetX && player.y === targetY) {
+    zoneInfo(player);
+    return {
+      player: sanitize(player),
+      pathLength: 0,
+      arrived: true,
+      wasBlocked: false,
+      targetZone: resolvedZone || player.currentZoneName,
+    };
+  }
+
+  const { path, reachable } = findPath(collisionMap, worldMap.width, worldMap.height, player.x, player.y, targetX, targetY);
+  if (!reachable || path.length < 2) return { error: '无法到达目标位置，路径被完全阻断。' };
+
+  // Walk tick-by-tick (skip index 0 which is current position)
+  for (let i = 1; i < path.length; i += 1) {
+    const prev = path[i - 1];
+    const step = path[i];
+    player.x = step.x;
+    player.y = step.y;
+    player.lastDirection = directionFromDelta(step.x - prev.x, step.y - prev.y);
+    touchAction(playerId);
+    broadcast();
+    if (i < path.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, MOVE_TICK_MS));
+    }
+  }
+
   zoneInfo(player);
-  emitPerception('move', playerId, player.name, player.x, player.y, { direction, steps: actual, zone: player.currentZoneName });
+  emitPerception('move', playerId, player.name, player.x, player.y, {
+    pathLength: path.length - 1,
+    zone: player.currentZoneName,
+  });
   addActivity(playerId, { type: 'move', text: `移动到 (${player.x}, ${player.y}) - ${player.currentZoneName}` });
   broadcast();
-  return { player: sanitize(player), actualSteps: actual, blocked };
+
+  return {
+    player: sanitize(player),
+    pathLength: path.length - 1,
+    arrived: true,
+    wasBlocked,
+    targetZone: resolvedZone || player.currentZoneName,
+  };
 }
 
 function chat(playerId, text) {
@@ -521,7 +657,7 @@ function readMap(playerId) {
     touchAction(playerId);
     broadcast();
   }
-  return mapDirectory;
+  return mapDirectory.filter((z) => z.navigable);
 }
 
 function setThinking(playerId, isThinking) {
@@ -530,6 +666,14 @@ function setThinking(playerId, isThinking) {
   touchHeartbeat(playerId);
   player.isThinking = Boolean(isThinking);
   broadcast();
+}
+
+function sanitizeAllPlayers() {
+  const result = {};
+  for (const [id, player] of Object.entries(players)) {
+    result[id] = sanitize(player);
+  }
+  return result;
 }
 
 module.exports = {
@@ -556,7 +700,10 @@ module.exports = {
   getMapDirectory: () => mapDirectory,
   getCharacterList: () => CHARACTER_SPRITES.slice(),
   getAllPlayers: () => players,
+  sanitizeAllPlayers,
   getChatHistory: () => chatHistory,
   getWorldMap: () => worldMap,
   drainChat,
+  refreshZoneInfo,
+  shutdown,
 };

@@ -68,13 +68,15 @@ SERVER_URL=http://localhost:5660 BOT_NAME=Alice node packages/mcp-bridge/bin/bri
 
 | Tool | Type | Description |
 |---|---|---|
-| `walk` | action | Move around the town (`N`, `S`, `W`, `E`) |
-| `say` | action | Speak in the town |
+| `login` | auth | Login or create a profile |
+| `list-profile` | auth | List local profiles |
+| `logout` | auth | Logout current session |
+| `characters` | query | List available character sprites |
+| `look` | query | Inspect nearby surroundings |
+| `map` | query | Read the town map directory |
+| `walk` | action | Walk to a target (auto-pathfinding) |
+| `chat` | action | Speak in the town |
 | `interact` | action | Interact with the current area |
-| `choose_character` | action | Choose a character sprite |
-| `look_around` | query | Inspect nearby surroundings |
-| `read_map_directory` | query | Read the town map directory |
-| `list_characters` | query | List available character sprites |
 
 ## License
 

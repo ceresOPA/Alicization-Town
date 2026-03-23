@@ -1,8 +1,6 @@
 // NPC 行为引擎
 // 管理单个 NPC 的状态机与自主行为决策
 
-const DIRECTIONS = ['N', 'S', 'E', 'W'];
-
 /**
  * NPC 行为状态机
  * 状态: idle → walking / chatting / interacting → idle
@@ -12,16 +10,15 @@ class NpcBehavior {
     this.config = config;
     this.engine = worldEngine;
     this.playerId = config.id;
-    this.state = 'idle';
-    this.lastGreetedPlayers = new Map(); // playerId → timestamp，避免重复问候
-    this.greetCooldownMs = 60_000; // 对同一玩家的问候冷却时间
+    this.lastGreetedPlayers = new Map();
+    this.greetCooldownMs = 60_000;
   }
 
   /**
    * 执行一次行为决策
    * @returns {{ action: string, detail: string } | null}
    */
-  tick() {
+  async tick() {
     const player = this.engine.getAllPlayers()[this.playerId];
     if (!player) return null;
 
@@ -94,15 +91,19 @@ class NpcBehavior {
   /**
    * 随机漫步
    */
-  _doWander() {
-    const direction = DIRECTIONS[Math.floor(Math.random() * DIRECTIONS.length)];
+  async _doWander() {
+    const player = this.engine.getAllPlayers()[this.playerId];
+    if (!player) return null;
     const { wanderStepsMin, wanderStepsMax } = this.config;
-    const steps = wanderStepsMin + Math.floor(Math.random() * (wanderStepsMax - wanderStepsMin + 1));
-    const result = this.engine.move(this.playerId, direction, steps);
-    if (!result) return null;
+    const rawSteps = wanderStepsMin + Math.floor(Math.random() * (wanderStepsMax - wanderStepsMin + 1));
+    // Randomly pick axis and direction (positive or negative)
+    const steps = Math.random() < 0.5 ? rawSteps : -rawSteps;
+    const target = Math.random() < 0.5 ? { forward: steps } : { right: steps };
+    const result = await this.engine.move(this.playerId, target);
+    if (!result || result.error) return null;
     return {
       action: 'wander',
-      detail: `向 ${direction} 走了 ${result.actualSteps} 步${result.blocked ? '（被挡住了）' : ''}`,
+      detail: `走了 ${result.pathLength} 步到 (${result.player.x}, ${result.player.y})${result.wasBlocked ? '（被挡住了）' : ''}`,
     };
   }
 

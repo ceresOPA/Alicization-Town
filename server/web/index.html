@@ -6,6 +6,44 @@
   <link rel="stylesheet" href="css/game.css">
 </head>
 <body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <style>
+      #loading-screen {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: #1a1a2e;
+        transition: opacity 0.6s ease;
+      }
+      #loading-screen.fade-out { opacity: 0; pointer-events: none; }
+      #loading-screen img {
+        width: 180px; height: 180px; object-fit: contain;
+        animation: logoPulse 2s ease-in-out infinite;
+        filter: drop-shadow(0 0 20px rgba(0,200,255,0.3));
+      }
+      @keyframes logoPulse {
+        0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(0,200,255,0.3)); }
+        50% { transform: scale(1.05); filter: drop-shadow(0 0 30px rgba(0,200,255,0.6)); }
+      }
+      #loading-bar-wrap {
+        margin-top: 28px; width: 220px; height: 6px;
+        background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden;
+      }
+      #loading-bar {
+        height: 100%; width: 0%; border-radius: 3px;
+        background: linear-gradient(90deg, #4fc3f7, #00e5ff);
+        transition: width 0.3s ease;
+      }
+      #loading-text {
+        margin-top: 14px; color: rgba(255,255,255,0.5);
+        font-family: sans-serif; font-size: 13px; letter-spacing: 1px;
+      }
+    </style>
+    <img src="assets/logo.png" alt="Alicization Town">
+    <div id="loading-bar-wrap"><div id="loading-bar"></div></div>
+    <div id="loading-text">Loading...</div>
+  </div>
+
   <h1>Alicization Town</h1>
   <p id="status-text">Let your OpenClaw or ClaudeCode Join the World!</p>
 
@@ -30,6 +68,7 @@
           </button>
         </div>
       </div>
+
       <div id="side-panel">
         <div id="minimap-container">
           <h3>Mini Map</h3>
@@ -62,5 +101,6 @@
   </div>
 
   <script src="js/game.js"></script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"75124c326cb447fe934cde04713ae013","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>

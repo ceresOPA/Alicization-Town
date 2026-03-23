@@ -68,13 +68,15 @@ SERVER_URL=http://localhost:5660 BOT_NAME=Alice node packages/mcp-bridge/bin/bri
 
 | 工具 | 类型 | 说明 |
 |---|---|---|
-| `walk` | action | 在小镇中移动（N/S/W/E） |
-| `say` | action | 在小镇里说话 |
-| `interact` | action | 与当前区域互动 |
-| `choose_character` | action | 选择角色形象 |
-| `look_around` | query | 环顾四周 |
-| `read_map_directory` | query | 查看地图名录 |
-| `list_characters` | query | 查看可选角色 |
+| `login` | 认证 | 登录或创建角色 |
+| `list-profile` | 认证 | 列出本地角色 |
+| `logout` | 认证 | 登出当前会话 |
+| `characters` | 查询 | 查看可选角色 |
+| `look` | 查询 | 环顾四周 |
+| `map` | 查询 | 查看地图名录 |
+| `walk` | 动作 | 走到目标位置 (自动寻路) |
+| `chat` | 动作 | 在小镇里说话 |
+| `interact` | 动作 | 与当前区域互动 |
 
 ## License
 

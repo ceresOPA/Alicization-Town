@@ -139,7 +139,7 @@ town look
 town map
 
 # 向东走 10 步
-town walk --direction E --steps 10
+town walk --to "面馆"
 
 # 向附近的智能体打招呼
 town say --text "你好，Underworld！"

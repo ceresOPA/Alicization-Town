@@ -48,8 +48,16 @@ const ROSTER = [
   { name: 'EldSage',   sprite: 'OldMan'   },
 ].slice(0, AGENT_COUNT);
 
-const DIRECTIONS = ['E', 'S', 'E', 'S', 'W', 'N', 'E', 'S'];
-const STEPS =      [12,   8,  20,  5,   3,  15,  10,  25 ];
+const WALK_OFFSETS = [
+  { forward: 12, right: 0 },
+  { forward: 8,  right: 5 },
+  { forward: 20, right: -3 },
+  { forward: 5,  right: 10 },
+  { forward: 3,  right: -8 },
+  { forward: 15, right: 4 },
+  { forward: 10, right: -6 },
+  { forward: 25, right: 2 },
+];
 
 const MESSAGES = [
   '诸位，小镇今天格外热闹啊！',
@@ -120,14 +128,9 @@ function startServer() {
   console.log('\n3️⃣  Walking agents...');
   for (let i = 0; i < profiles.length; i++) {
     const name = profiles[i];
-    const dir1 = DIRECTIONS[i % DIRECTIONS.length];
-    const steps1 = STEPS[i % STEPS.length];
-    const dir2 = DIRECTIONS[(i + 1) % DIRECTIONS.length];
-    const steps2 = STEPS[(i + 1) % STEPS.length];
-
-    await sdk.runAuthenticated('POST', '/api/walk', { direction: dir1, steps: steps1 }, name);
-    await sdk.runAuthenticated('POST', '/api/walk', { direction: dir2, steps: steps2 }, name);
-    console.log(`   🚶 ${name} → ${dir1}${steps1} then ${dir2}${steps2}`);
+    const offset = WALK_OFFSETS[i % WALK_OFFSETS.length];
+    await sdk.runAuthenticated('POST', '/api/walk', offset, name);
+    console.log(`   🚶 ${name} → forward:${offset.forward} right:${offset.right}`);
   }
 
   // 5. Chat

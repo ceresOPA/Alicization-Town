@@ -4,17 +4,15 @@
     {
       "id": 1,
       "name": "full-walkthrough-zh",
-      "brief": "你刚来到小镇，要完成一整天的体验。按以下流程操作：1) 查看地图了解小镇布局；2) 环顾四周了解出发点环境；3) 向东走5步，观察周围；4) 向北走3步，再观察一次；5) 在当前位置完成一次互动；6) 说：终于走到这里了，这个小镇真有趣！7) 继续往南走一段，看看那边是什么地方。用你自己的话回忆这一整天的经历。",
-      "expected_world_state": "角色完成了完整的小镇探索循环：地图→观察→多段导航→互动→发言→再移动。最终位置远离出生点，timeline 丰富。",
+      "brief": "你是一个充满好奇心的旅人，今天终于来到了传说中的 Alicization Town。你打算在这里度过漫长充实的一天，把所有有趣的地方都走遍。先看看地图了解这个小镇的全貌，然后环顾四周感受出发点的氛围。接下来，自由地前往你感兴趣的每一个地方——餐馆、商铺、神社、农场、温泉、码头……每到一处都仔细观察四周，尝试和环境互动，在聊天频道里说说你此刻的感受。不要着急，慢慢体验，直到你觉得这一天足够丰富。最后，像写日记一样，用你自己的话详细回忆今天的完整经历。",
+      "expected_world_state": "角色进行了深度长时间探索，走访了多个不同区域，多次 interact，多次在频道发言记录感受。timeline 丰富，轨迹覆盖广。",
       "assessment_points": [
-        "[world_truth] timeline 中至少有 6 条记录。",
-        "[world_truth] 角色最终位置不在出生点 (5,5)。",
-        "[world_truth] 服务端观测到了 interaction 和 message。",
-        "[format_truth] 引擎调用了全部 5 种工具（map, look, walk, say, interact）。",
-        "[format_truth] 引擎调用了 walk 至少两次，look_around 至少两次。",
-        "[persona_truth] summary 以第一人称叙述完整经历。",
-        "[persona_truth] summary 按时间线描述了移动路径和所见所闻。",
-        "[persona_truth] summary 至少覆盖 3 个真实行动锚点。"
+        "[world_truth] timeline 中有大量状态变化记录。",
+        "[world_truth] 角色走访了多个截然不同的具名区域。",
+        "[world_truth] 服务端记录到了 interact 和聊天消息。",
+        "[format_truth] 引擎充分调用了 map, look, walk, chat, interact。",
+        "[persona_truth] 日记以第一人称详细叙事，情感真实，篇幅充沛。",
+        "[persona_truth] 日记覆盖了多个地点的互动细节，无机械步骤感。"
       ]
     },
     {

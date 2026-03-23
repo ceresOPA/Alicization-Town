@@ -129,8 +129,10 @@ function createMockServer() {
           }
           res.end(JSON.stringify({
             player: { x: 8, y: 5, zone: 'Town Center', zoneDesc: 'Central square' },
-            actualSteps: payload.steps,
-            blocked: false,
+            pathLength: 3,
+            arrived: true,
+            wasBlocked: false,
+            targetZone: 'Town Center',
           }));
           return;
         }
@@ -306,7 +308,7 @@ describe('Bridge MCP (smoke)', () => {
     assert.match(await callTool(bridge, 5, 'characters'), /Samurai/);
     assert.match(await callTool(bridge, 6, 'map'), /Town Center/);
     assert.match(await callTool(bridge, 7, 'look'), /位置感知/);
-    assert.match(await callTool(bridge, 8, 'walk', { direction: 'E', steps: 3 }), /你试图向 E 走 3 步/);
+    assert.match(await callTool(bridge, 8, 'walk', { forward: 3 }), /已到达/);
     assert.match(await callTool(bridge, 9, 'chat', { text: '你好' }), /你说: 你好/);
     assert.match(await callTool(bridge, 10, 'chat'), /聊天频道/);
     assert.match(await callTool(bridge, 11, 'interact'), /互动/);

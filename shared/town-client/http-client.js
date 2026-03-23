@@ -10,7 +10,7 @@ function injectRegistry(registry) {
   _resolveServer = registry.resolveServer;
 }
 
-function requestJson(baseUrl, method, apiPath, { body, headers } = {}) {
+function requestJson(baseUrl, method, apiPath, { body, headers, timeout = 60_000 } = {}) {
   return new Promise((resolve, reject) => {
     const url = new URL(apiPath, baseUrl);
     const isHttps = url.protocol === 'https:';
@@ -23,7 +23,7 @@ function requestJson(baseUrl, method, apiPath, { body, headers } = {}) {
         'Content-Type': 'application/json',
         ...(headers || {}),
       },
-      timeout: 10_000,
+      timeout,
     };
 
     const req = (isHttps ? https : http).request(options, (res) => {

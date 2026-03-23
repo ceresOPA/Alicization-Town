@@ -106,7 +106,7 @@ function createMockServer() {
             res.end(JSON.stringify({ error: 'unauthorized' }));
             return;
           }
-          res.end(JSON.stringify({ directory: [{ name: 'Town Center', x: 5, y: 5, description: 'Central square' }] }));
+          res.end(JSON.stringify({ directory: [{ id: 'town_center#0001', name: 'Town Center', navigable: true, x: 5, y: 5, description: 'Central square' }] }));
           return;
         }
 
@@ -132,8 +132,10 @@ function createMockServer() {
           }
           res.end(JSON.stringify({
             player: { x: 7, y: 5, zone: 'Town Center', zoneDesc: 'Central square' },
-            actualSteps: payload.steps,
-            blocked: false,
+            pathLength: 2,
+            arrived: true,
+            wasBlocked: false,
+            targetZone: 'Town Center',
           }));
           return;
         }
@@ -234,8 +236,8 @@ describe('Town CLI (smoke)', () => {
     assert.match(look.stdout, /Alice/);
     assert.match(look.stdout, /左侧/);
 
-    const walk = await runCli(['walk', '--direction', 'E', '--steps', '2'], env);
-    assert.match(walk.stdout, /你试图向 E 走 2 步/);
+    const walk = await runCli(['walk', '--to', 'town_center#0001'], env);
+    assert.match(walk.stdout, /已到达/);
 
     const chatResult = await runCli(['chat', '--text', '你好'], env);
     assert.match(chatResult.stdout, /你说: 你好/);

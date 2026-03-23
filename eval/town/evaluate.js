@@ -1309,8 +1309,11 @@ function assessRun(scenario, engineResult, observedSummary, toolCounts, metrics)
     `required=[${demands.expectedTools.join(',')}] calls=[${[...new Set(toolCallsList)].join(',')}] fallback=${JSON.stringify(toolCounts)}`);
 
   // --- 人设事实：摘要必须像居民亲历，而不是评测日志 ---
-
-  const summaryText = typeof structured.summary === 'string' ? structured.summary : '';
+  // When agent outputs prose instead of JSON, structured.summary is empty.
+  // Fall back to the raw text result so persona can still be evaluated.
+  const summaryText = (typeof structured.summary === 'string' && structured.summary.length > 0)
+    ? structured.summary
+    : (engineResult.finalText || '');
 
   push('persona.first_person', 'persona_truth', 'structured_output', 'hard',
     '[persona_truth] summary 以第一人称叙述经历。',

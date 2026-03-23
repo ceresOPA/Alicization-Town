@@ -7,16 +7,21 @@ function throwForAuth(auth) {
 
 async function walk(args) {
   const flags = parseFlags(args);
-  const direction = flags.direction || flags._[0];
-  const rawSteps = flags.steps || flags._[1];
-  const steps = Number(rawSteps);
-  if (!direction || !Number.isFinite(steps)) {
-    throw new Error('用法: town walk --direction <N|S|W|E> --steps <步数>');
+  const target = {};
+  if (flags.to || flags._[0]) target.to = flags.to || flags._.join(' ');
+  if (flags.x !== undefined) target.x = Number(flags.x);
+  if (flags.y !== undefined) target.y = Number(flags.y);
+  if (flags.forward !== undefined) target.forward = Number(flags.forward);
+  if (flags.right !== undefined) target.right = Number(flags.right);
+
+  if (!target.to && target.x === undefined && target.forward === undefined && target.right === undefined) {
+    throw new Error('用法: town walk --to <地名> | --x <X> --y <Y> | --forward <N> --right <N>');
   }
 
-  const { auth, result } = await runAuthenticated('POST', '/api/walk', { direction, steps });
+  const { auth, result } = await runAuthenticated('POST', '/api/walk', target);
   if (!result) throwForAuth(auth);
-  console.log(formatWalk(direction, steps));
+  if (result.error) throw new Error(result.error);
+  console.log(formatWalk(result));
 }
 
 async function chat(args) {

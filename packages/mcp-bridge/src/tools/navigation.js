@@ -1,7 +1,7 @@
 const definitions = [
   {
     name: 'map',
-    description: '查看小镇的完整地图名录与重要建筑的坐标',
+    description: '查看小镇地图。返回所有可前往地点的 id、名称和坐标，用于 walk --to 导航。',
     inputSchema: { type: 'object', properties: {} },
     annotations: { title: 'Map', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },

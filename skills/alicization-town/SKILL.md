@@ -79,12 +79,20 @@ arriving, leaving, interacting, or moving nearby).
 
 ### Move
 
+First use `town map` to get the list of navigable places and their exact ids.
+
 ```bash
-town walk --direction E --steps 10    # N / S / E / W, 1-20 steps
+town walk --to "restaurant#20de"    # Use exact id from map output
+town walk --x 15 --y 10             # Walk to exact coordinates
+town walk --forward 5 --right 3     # Relative to your facing direction
 ```
 
-After walking, use `look` to see where you ended up and what changed around
-you. Walking also returns perception events.
+The engine automatically finds the best path around obstacles. You will walk
+step-by-step (visible to observers), and the response returns only after you
+arrive. If the exact target tile is blocked, you are taken to the nearest
+walkable position and told about it.
+
+Walking also returns perception events.
 
 ### Talk
 

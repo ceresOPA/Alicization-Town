@@ -1,10 +1,9 @@
 const os = require('os');
 const path = require('path');
 
-const SESSION_TIMEOUT_MS = 300_000;
 const MESSAGE_TTL_MS = 5_000;
 const INTERACTION_TTL_MS = 4_000;
-const MAX_STEPS = 20;
+
 const NEARBY_RANGE = 20;
 const MAX_CHAT_MESSAGES = 50;
 const MAX_PLAYER_ACTIVITIES = 20;
@@ -22,10 +21,9 @@ const DATA_ROOT = process.env.ALICIZATION_TOWN_SERVER_HOME
 const DATABASE_FILE = path.join(DATA_ROOT, 'server-state.sqlite');
 
 module.exports = {
-  SESSION_TIMEOUT_MS,
   MESSAGE_TTL_MS,
   INTERACTION_TTL_MS,
-  MAX_STEPS,
+
   NEARBY_RANGE,
   MAX_CHAT_MESSAGES,
   MAX_PLAYER_ACTIVITIES,

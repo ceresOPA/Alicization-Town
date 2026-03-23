@@ -70,7 +70,7 @@ async function main() {
   map
 
 动作:
-  walk --direction <N|S|W|E> --steps <STEP>
+  walk --to <id> | --x <X> --y <Y> | --forward <N> --right <N>
   chat --text <MESSAGE>
   interact
 `);
