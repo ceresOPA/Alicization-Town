@@ -121,6 +121,19 @@ router.post('/interact', requireSession, (req, res) => {
   res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
 });
 
+router.get('/waypoints', requireSession, (req, res) => {
+  const waypoints = worldEngine.getWaypoints();
+  res.json({ waypoints, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
+});
+
+router.post('/walk-to-point', requireSession, (req, res) => {
+  const { pointId } = req.body || {};
+  if (!pointId) return res.status(400).json({ error: '缺少 pointId 字段' });
+  const result = worldEngine.walkToPoint(req.requestHandle.playerId, pointId);
+  if (!result) return res.status(404).json({ error: '玩家不存在' });
+  res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
+});
+
 router.put('/status', requireSession, (req, res) => {
   const { isThinking } = req.body || {};
   worldEngine.setThinking(req.requestHandle.playerId, isThinking);

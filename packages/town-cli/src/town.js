@@ -29,6 +29,10 @@ async function main() {
       await require('./lib/explore').map(args);
       break;
 
+    case 'points':
+      await require('./lib/act').point(args);
+      break;
+
     case 'walk':
       await require('./lib/act').walk(args);
       break;
@@ -70,6 +74,8 @@ async function main() {
   map
 
 动作:
+  points                          查看所有路标点及其 ID
+  walk <pointId>                  通过路标点 ID 导航
   walk --direction <N|S|W|E> --steps <STEP>
   chat --text <MESSAGE>
   interact

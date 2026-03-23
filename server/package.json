@@ -7,12 +7,21 @@
     "start": "node src/main.js",
     "test": "node --test test/*.test.js"
   },
-  "keywords": ["mcp", "multi-agent", "pixel-art", "sandbox", "ai-agents", "game-server"],
+  "keywords": [
+    "mcp",
+    "multi-agent",
+    "pixel-art",
+    "sandbox",
+    "ai-agents",
+    "game-server"
+  ],
   "author": "ceresOPA",
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
     "express": "^5.2.1",
+    "graphology": "^0.26.0",
+    "graphology-shortest-path": "^2.1.0",
     "socket.io": "^4.8.3"
   }
 }

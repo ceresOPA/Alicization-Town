@@ -5,6 +5,8 @@ const { EventEmitter } = require('events');
 const { ZONE_INTERACTIONS, ZONE_CATEGORY_MAP } = require('../data/interactions');
 const { CHARACTER_SPRITES } = require('../data/characters');
 const { describeRelativeDirection } = require('./relative-direction');
+const PathPlanner = require('./path-planner');
+const PathExecutor = require('./path-executor');
 const {
   MESSAGE_TTL_MS,
   INTERACTION_TTL_MS,
@@ -21,6 +23,9 @@ const {
 } = require('../config/service-config');
 const { sqliteStateStore } = require('../persistence/sqlite-state-store');
 const perception = require('./perception');
+
+let pathPlanner = null;
+let pathExecutor = null;
 
 let worldMap = null;
 let collisionMap = [];
@@ -70,6 +75,14 @@ function init(mapPath) {
     y: Math.floor((zone.y + zone.height / 2) / worldMap.tileheight),
     description: zone.properties?.find((prop) => prop.name === 'description')?.value || '',
   }));
+
+  // 初始化路径规划器和路径执行器
+  pathPlanner = new PathPlanner(mapPath, collisionMap, worldMap);
+  pathExecutor = new PathExecutor({
+    move,
+    getZoneAt,
+    getAllPlayers: () => players
+  });
 }
 
 function getZoneAt(gridX, gridY) {
@@ -415,8 +428,41 @@ function move(playerId, direction, steps) {
   touchAction(playerId);
   player.lastDirection = direction;
   const clamped = Math.max(1, Math.min(steps, MAX_STEPS));
-  const dx = direction === 'E' ? 1 : direction === 'W' ? -1 : 0;
-  const dy = direction === 'S' ? 1 : direction === 'N' ? -1 : 0;
+  let dx = 0;
+  let dy = 0;
+  
+  // 处理对角线方向
+  switch (direction) {
+    case 'E':
+      dx = 1;
+      break;
+    case 'W':
+      dx = -1;
+      break;
+    case 'S':
+      dy = 1;
+      break;
+    case 'N':
+      dy = -1;
+      break;
+    case 'NE':
+      dx = 1;
+      dy = -1;
+      break;
+    case 'NW':
+      dx = -1;
+      dy = -1;
+      break;
+    case 'SE':
+      dx = 1;
+      dy = 1;
+      break;
+    case 'SW':
+      dx = -1;
+      dy = 1;
+      break;
+  }
+  
   let actual = 0;
   let blocked = false;
   for (let index = 0; index < clamped; index += 1) {
@@ -532,6 +578,67 @@ function setThinking(playerId, isThinking) {
   broadcast();
 }
 
+function findPath(playerId, targetX, targetY) {
+  const player = players[playerId];
+  if (!player || !pathPlanner) return null;
+  
+  const path = pathPlanner.findPath(player.x, player.y, targetX, targetY);
+  if (!path) return { error: '无法找到路径' };
+  
+  return { path };
+}
+
+function moveAlongPath(playerId, path) {
+  const player = players[playerId];
+  if (!player || !pathExecutor) return null;
+  
+  const result = pathExecutor.executePath(playerId, path);
+  if (!result.success) return { error: '路径执行失败' };
+  
+  return { 
+    player: sanitize(player), 
+    actualSteps: result.actualSteps, 
+    blocked: result.blocked 
+  };
+}
+
+function getWaypoints() {
+  return pathPlanner ? pathPlanner.getWaypoints() : [];
+}
+
+function walkToPoint(playerId, pointId) {
+  const player = players[playerId];
+  if (!player || !pathPlanner || !pathExecutor) return null;
+  
+  // 找到路标点
+  const waypoint = pathPlanner.getWaypointById(pointId);
+  if (!waypoint) return { success: false, message: '路标点不存在' };
+  
+  // 寻找路径
+  const path = pathPlanner.findPath(player.x, player.y, waypoint.x, waypoint.y);
+  if (!path) return { success: false, message: '无法找到路径' };
+  
+  // 执行路径，传递目标路标点 ID
+  const result = pathExecutor.executePath(playerId, path, pointId);
+  if (!result.success) {
+    if (result.blocked) {
+      return { success: false, message: '路径执行被阻塞' };
+    } else if (!result.reachedTarget) {
+      return { success: false, message: '未到达目标区域' };
+    } else {
+      return { success: false, message: '路径执行失败' };
+    }
+  }
+  
+  return { 
+    success: true, 
+    actualSteps: result.actualSteps, 
+    blocked: result.blocked,
+    reachedTarget: result.reachedTarget,
+    player: sanitize(player)
+  };
+}
+
 module.exports = {
   init,
   events,
@@ -553,6 +660,11 @@ module.exports = {
   readMap,
   setThinking,
   touchAction,
+  findPath,
+  moveAlongPath,
+  getWaypoints,
+  walkToPoint,
+  getZoneAt,
   getMapDirectory: () => mapDirectory,
   getCharacterList: () => CHARACTER_SPRITES.slice(),
   getAllPlayers: () => players,

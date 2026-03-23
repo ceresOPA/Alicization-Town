@@ -1144,13 +1144,38 @@ var require_act = __commonJS({
       if (!auth) return;
       throw new Error(auth.message || "\u5F53\u524D\u65E0\u6CD5\u6267\u884C\u8BE5\u64CD\u4F5C\uFF0C\u8BF7\u5148 login\u3002");
     }
+    async function point(args2) {
+      const { auth, result } = await runAuthenticated("GET", "/api/waypoints");
+      if (!result) throwForAuth(auth);
+      console.log("\u{1F5FA}\uFE0F  \u8DEF\u6807\u70B9\u5217\u8868:");
+      console.log("");
+      result.waypoints.forEach((waypoint) => {
+        console.log(`Id\uFF1A${waypoint.id}\uFF0CName\uFF1A${waypoint.name}\uFF0CType\uFF1A${waypoint.type}`);
+      });
+      console.log("");
+      console.log("\u4F7F\u7528: node town walk <pointId> \u6765\u5BFC\u822A\u5230\u6307\u5B9A\u8DEF\u6807\u70B9");
+      console.log("");
+      console.log("\u793A\u4F8B: node town walk wp_building_\u6B66\u5668\u9632\u5177\u5E97_weapon_and_armor_store_");
+    }
     async function walk(args2) {
       const flags = parseFlags(args2);
+      const pointId = flags._[0];
+      if (pointId && !flags.direction && !flags.steps) {
+        const { auth: auth2, result: result2 } = await runAuthenticated("POST", "/api/walk-to-point", { pointId });
+        if (!result2) throwForAuth(auth2);
+        if (result2.success) {
+          console.log(`\u2705 \u6210\u529F\u5BFC\u822A\u5230\u8DEF\u6807\u70B9: ${pointId}`);
+          console.log(`\u{1F4CD} \u79FB\u52A8\u4E86 ${result2.actualSteps} \u6B65`);
+        } else {
+          console.log(`\u274C \u5BFC\u822A\u5931\u8D25: ${result2.message || "\u672A\u77E5\u9519\u8BEF"}`);
+        }
+        return;
+      }
       const direction = flags.direction || flags._[0];
       const rawSteps = flags.steps || flags._[1];
       const steps = Number(rawSteps);
       if (!direction || !Number.isFinite(steps)) {
-        throw new Error("\u7528\u6CD5: town walk --direction <N|S|W|E> --steps <\u6B65\u6570>");
+        throw new Error("\u7528\u6CD5: town walk <pointId> \u6216 town walk --direction <N|S|W|E> --steps <\u6B65\u6570>");
       }
       const { auth, result } = await runAuthenticated("POST", "/api/walk", { direction, steps });
       if (!result) throwForAuth(auth);
@@ -1171,7 +1196,7 @@ var require_act = __commonJS({
       if (!result) throwForAuth(auth);
       console.log(formatInteract(result));
     }
-    module2.exports = { walk, chat, interact };
+    module2.exports = { point, walk, chat, interact };
   }
 });
 
@@ -1336,6 +1361,9 @@ async function main() {
     case "map":
       await require_explore().map(args);
       break;
+    case "points":
+      await require_act().point(args);
+      break;
     case "walk":
       await require_act().walk(args);
       break;
@@ -1372,6 +1400,8 @@ async function main() {
   map
 
 \u52A8\u4F5C:
+  points                          \u67E5\u770B\u6240\u6709\u8DEF\u6807\u70B9\u53CA\u5176 ID
+  walk <pointId>                  \u901A\u8FC7\u8DEF\u6807\u70B9 ID \u5BFC\u822A
   walk --direction <N|S|W|E> --steps <STEP>
   chat --text <MESSAGE>
   interact
