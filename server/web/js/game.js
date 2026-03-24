@@ -490,7 +490,7 @@
     // === 更新插值动画 ===
     // ==========================================
     function updatePhysics() {
-      const MOVE_SPEED = 2, ANIM_SPEED = 0.15;
+      const MOVE_SPEED = 1.2, ANIM_SPEED = 0.09;
       for (const id in clientPlayers) {
         const p = clientPlayers[id];
         let isMoving = false;
