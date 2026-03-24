@@ -34,10 +34,26 @@ let nextChatCursor = 0;
 const players = {};
 const chatHistory = [];
 const playerActivities = {};
+const playerActionLocks = new Map();
 const events = new EventEmitter();
 
 function deriveHandle(publicKey) {
   return `at_${crypto.createHash('sha256').update(publicKey).digest('hex').slice(0, 24)}`;
+}
+
+function acquireActionLock(playerId, actionType) {
+  const now = Date.now();
+  const lockKey = `${playerId}`;
+  const existingLock = playerActionLocks.get(lockKey);
+  if (existingLock && now - existingLock.timestamp < 500) {
+    return false;
+  }
+  playerActionLocks.set(lockKey, { timestamp: now, actionType });
+  return true;
+}
+
+function releaseActionLock(playerId) {
+  playerActionLocks.delete(`${playerId}`);
 }
 
 function init(mapPath) {
@@ -412,33 +428,40 @@ function touchAction(playerId) {
 function move(playerId, direction, steps) {
   const player = players[playerId];
   if (!player) return null;
-  touchAction(playerId);
-  player.lastDirection = direction;
-  const clamped = Math.max(1, Math.min(steps, MAX_STEPS));
-  const dx = direction === 'E' ? 1 : direction === 'W' ? -1 : 0;
-  const dy = direction === 'S' ? 1 : direction === 'N' ? -1 : 0;
-  let actual = 0;
-  let blocked = false;
-  for (let index = 0; index < clamped; index += 1) {
-    const nx = player.x + dx;
-    const ny = player.y + dy;
-    if (nx < 0 || nx >= worldMap.width || ny < 0 || ny >= worldMap.height) {
-      blocked = true;
-      break;
-    }
-    if (collisionMap[ny * worldMap.width + nx] === 1) {
-      blocked = true;
-      break;
-    }
-    player.x = nx;
-    player.y = ny;
-    actual += 1;
+  if (!acquireActionLock(playerId, 'move')) {
+    return { player: sanitize(player), actualSteps: 0, blocked: false, conflict: true };
   }
-  zoneInfo(player);
-  emitPerception('move', playerId, player.name, player.x, player.y, { direction, steps: actual, zone: player.currentZoneName });
-  addActivity(playerId, { type: 'move', text: `移动到 (${player.x}, ${player.y}) - ${player.currentZoneName}` });
-  broadcast();
-  return { player: sanitize(player), actualSteps: actual, blocked };
+  try {
+    touchAction(playerId);
+    player.lastDirection = direction;
+    const clamped = Math.max(1, Math.min(steps, MAX_STEPS));
+    const dx = direction === 'E' ? 1 : direction === 'W' ? -1 : 0;
+    const dy = direction === 'S' ? 1 : direction === 'N' ? -1 : 0;
+    let actual = 0;
+    let blocked = false;
+    for (let index = 0; index < clamped; index += 1) {
+      const nx = player.x + dx;
+      const ny = player.y + dy;
+      if (nx < 0 || nx >= worldMap.width || ny < 0 || ny >= worldMap.height) {
+        blocked = true;
+        break;
+      }
+      if (collisionMap[ny * worldMap.width + nx] === 1) {
+        blocked = true;
+        break;
+      }
+      player.x = nx;
+      player.y = ny;
+      actual += 1;
+    }
+    zoneInfo(player);
+    emitPerception('move', playerId, player.name, player.x, player.y, { direction, steps: actual, zone: player.currentZoneName });
+    addActivity(playerId, { type: 'move', text: `移动到 (${player.x}, ${player.y}) - ${player.currentZoneName}` });
+    broadcast();
+    return { player: sanitize(player), actualSteps: actual, blocked };
+  } finally {
+    releaseActionLock(playerId);
+  }
 }
 
 function chat(playerId, text) {
@@ -463,57 +486,71 @@ function chat(playerId, text) {
 function interact(playerId) {
   const player = players[playerId];
   if (!player) return null;
-  touchAction(playerId);
-  const zone = getZoneAt(player.x, player.y);
-  const result = getInteractionForZone(zone);
-  player.interactionText = result.action;
-  player.interactionIcon = result.icon || '';
-  player.interactionSound = result.sound || 'interact';
-  emitPerception('interact', playerId, player.name, player.x, player.y, { zone: zone ? zone.name : '小镇街道', action: result.action });
-  broadcast();
-  setTimeout(() => {
-    if (players[playerId]) {
-      players[playerId].interactionText = '';
-      players[playerId].interactionIcon = '';
-      players[playerId].interactionSound = '';
-      broadcast();
-    }
-  }, INTERACTION_TTL_MS);
-  const entry = {
-    time: Date.now(),
-    name: player.name,
-    zone: zone ? zone.name : '小镇街道',
-    action: result.action,
-    result: result.result,
-  };
-  events.emit('interaction', entry);
-  addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });
-  return { zone: zone ? zone.name : '小镇街道', ...result };
+  if (!acquireActionLock(playerId, 'interact')) {
+    return { conflict: true };
+  }
+  try {
+    touchAction(playerId);
+    const zone = getZoneAt(player.x, player.y);
+    const result = getInteractionForZone(zone);
+    player.interactionText = result.action;
+    player.interactionIcon = result.icon || '';
+    player.interactionSound = result.sound || 'interact';
+    emitPerception('interact', playerId, player.name, player.x, player.y, { zone: zone ? zone.name : '小镇街道', action: result.action });
+    broadcast();
+    setTimeout(() => {
+      if (players[playerId]) {
+        players[playerId].interactionText = '';
+        players[playerId].interactionIcon = '';
+        players[playerId].interactionSound = '';
+        broadcast();
+      }
+    }, INTERACTION_TTL_MS);
+    const entry = {
+      time: Date.now(),
+      name: player.name,
+      zone: zone ? zone.name : '小镇街道',
+      action: result.action,
+      result: result.result,
+    };
+    events.emit('interaction', entry);
+    addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });
+    return { zone: zone ? zone.name : '小镇街道', ...result };
+  } finally {
+    releaseActionLock(playerId);
+  }
 }
 
 function look(playerId) {
   const player = players[playerId];
   if (!player) return null;
-  touchAction(playerId);
-  const nearby = [];
-  for (const [id, other] of Object.entries(players)) {
-    if (id === playerId || other.name === 'Observer') continue;
-    const distance = Math.abs(other.x - player.x) + Math.abs(other.y - player.y);
-    if (distance <= NEARBY_RANGE) {
-      nearby.push({
-        id: other.id,
-        name: other.name,
-        distance,
-        relativeDirection: describeRelativeDirection(other.x - player.x, other.y - player.y, player.lastDirection),
-        zone: other.currentZoneName,
-        message: other.message || null,
-        lastSpeakAt: other.lastSpeakAt || null,
-        sprite: other.sprite,
-        presenceState: getPresenceState(other),
-      });
-    }
+  if (!acquireActionLock(playerId, 'look')) {
+    return { conflict: true };
   }
-  return { player: sanitize(player), nearby };
+  try {
+    touchAction(playerId);
+    const nearby = [];
+    for (const [id, other] of Object.entries(players)) {
+      if (id === playerId || other.name === 'Observer') continue;
+      const distance = Math.abs(other.x - player.x) + Math.abs(other.y - player.y);
+      if (distance <= NEARBY_RANGE) {
+        nearby.push({
+          id: other.id,
+          name: other.name,
+          distance,
+          relativeDirection: describeRelativeDirection(other.x - player.x, other.y - player.y, player.lastDirection),
+          zone: other.currentZoneName,
+          message: other.message || null,
+          lastSpeakAt: other.lastSpeakAt || null,
+          sprite: other.sprite,
+          presenceState: getPresenceState(other),
+        });
+      }
+    }
+    return { player: sanitize(player), nearby };
+  } finally {
+    releaseActionLock(playerId);
+  }
 }
 
 function readMap(playerId) {

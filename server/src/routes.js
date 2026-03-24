@@ -93,6 +93,7 @@ router.post('/logout', (req, res) => {
 router.get('/look', requireSession, (req, res) => {
   const result = worldEngine.look(req.requestHandle.playerId);
   if (!result) return res.status(404).json({ error: '玩家不存在' });
+  if (result.conflict) return res.status(409).json({ error: '动作冲突，请稍后重试' });
   res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
 });
 
@@ -104,6 +105,7 @@ router.post('/walk', requireSession, (req, res) => {
   if (!steps || steps < 1) return res.status(400).json({ error: '步数必须 >= 1' });
   const result = worldEngine.move(req.requestHandle.playerId, direction, Math.floor(steps));
   if (!result) return res.status(404).json({ error: '玩家不存在' });
+  if (result.conflict) return res.status(409).json({ error: '动作冲突，请稍后重试' });
   res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
 });
 
@@ -118,6 +120,7 @@ router.post('/chat', requireSession, (req, res) => {
 router.post('/interact', requireSession, (req, res) => {
   const result = worldEngine.interact(req.requestHandle.playerId);
   if (!result) return res.status(404).json({ error: '玩家不存在' });
+  if (result.conflict) return res.status(409).json({ error: '动作冲突，请稍后重试' });
   res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
 });
 
