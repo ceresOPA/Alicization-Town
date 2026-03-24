@@ -16,6 +16,7 @@ const {
   IDLE_AFTER_MS,
   LEASE_TTL_MS,
   TOKEN_TTL_MS,
+  MOVE_TICK_MS,
   LOGIN_PROOF_TTL_MS,
   SERVER_MACHINE_ID,
   SNOWFLAKE_EPOCH_MS,
@@ -27,7 +28,6 @@ let worldMap = null;
 let collisionMap = [];
 let semanticZones = [];
 let mapDirectory = [];
-const MOVE_TICK_MS = 200;
 let nextSpriteIndex = 0;
 let lastSnowflakeTimestamp = 0;
 let snowflakeSequence = 0;

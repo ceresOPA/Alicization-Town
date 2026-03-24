@@ -11,6 +11,7 @@ process.env.ALICIZATION_TOWN_SERVER_HOME = TEMP_HOME;
 process.env.ALICIZATION_TOWN_LEASE_TTL_MS = '120';
 process.env.ALICIZATION_TOWN_IDLE_AFTER_MS = '30';
 process.env.ALICIZATION_TOWN_TOKEN_TTL_MS = '1000';
+process.env.ALICIZATION_TOWN_MOVE_TICK_MS = '30';
 
 const MAP_PATH = path.join(__dirname, '..', 'web', 'assets', 'map.tmj');
 const worldEngine = require('../src/engine/world-engine');
