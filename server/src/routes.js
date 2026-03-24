@@ -68,10 +68,13 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-router.get('/look', requireSession, (req, res) => {
-  const result = worldEngine.look(req.requestHandle.playerId);
-  if (!result) return res.status(404).json({ error: '玩家不存在' });
-  res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
+router.get('/look', requireSession, async (req, res) => {
+  const release = await actionLock.acquire(req.requestHandle.playerId);
+  try {
+    const result = worldEngine.look(req.requestHandle.playerId);
+    if (!result) return res.status(404).json({ error: '玩家不存在' });
+    res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
+  } finally { release(); }
 });
 
 router.post('/walk', requireSession, async (req, res) => {

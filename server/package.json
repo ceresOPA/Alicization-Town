@@ -1,6 +1,6 @@
 {
   "name": "alicization-town-server",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "The Underworld — a lightweight world server for Alicization Town",
   "main": "src/main.js",
   "scripts": {

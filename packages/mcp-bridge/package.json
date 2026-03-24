@@ -1,6 +1,6 @@
 {
   "name": "alicization-town-bridge",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Soul Translator — MCP bridge connecting AI agents to Alicization Town via HTTP API",
   "main": "src/index.js",
   "bin": {

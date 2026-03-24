@@ -118,6 +118,11 @@
       heal: new Audio('assets/sounds/heal.wav'),
     };
     Object.values(sfx).forEach(s => { s.volume = 0.25; });
+    let sfxEnabled = true;
+    document.getElementById('sfx-toggle').addEventListener('click', () => {
+      sfxEnabled = !sfxEnabled;
+      document.getElementById('sfx-toggle').textContent = sfxEnabled ? 'SFX ON' : 'SFX OFF';
+    });
 
     const animalImages = {};
     ['Cat','Dog','Frog'].forEach(name => { const img = new Image(); img.src = `assets/animals/${name}.png`; animalImages[name] = img; });
@@ -396,7 +401,7 @@
               clientPlayers[id].lastHeartbeatAt = sp.lastHeartbeatAt;
               if (sp.interactionSound && !clientPlayers[id]._lastSound) {
                 clientPlayers[id]._lastSound = sp.interactionSound;
-                if (sfx[sp.interactionSound]) sfx[sp.interactionSound].cloneNode().play().catch(() => {});
+                if (sfxEnabled && sfx[sp.interactionSound]) sfx[sp.interactionSound].cloneNode().play().catch(() => {});
               }
               if (!sp.interactionSound) clientPlayers[id]._lastSound = null;
             }
@@ -418,7 +423,7 @@
           updateAiPanel();
         };
         eventSource.addEventListener('chatHistory', (e) => { JSON.parse(e.data).forEach(entry => addChatMessage(entry.name, entry.message, entry.time)); });
-        eventSource.addEventListener('chat', (e) => { const entry = JSON.parse(e.data); addChatMessage(entry.name, entry.message, entry.time); sfx.chat.cloneNode().play().catch(() => {}); });
+        eventSource.addEventListener('chat', (e) => { const entry = JSON.parse(e.data); addChatMessage(entry.name, entry.message, entry.time); if (sfxEnabled) sfx.chat.cloneNode().play().catch(() => {}); });
         eventSource.addEventListener('interaction', (e) => { addInteractionMessage(JSON.parse(e.data)); });
         eventSource.addEventListener('activity', (e) => {
           const data = JSON.parse(e.data);
@@ -490,7 +495,7 @@
     // === 更新插值动画 ===
     // ==========================================
     function updatePhysics() {
-      const MOVE_SPEED = 2, ANIM_SPEED = 0.15;
+      const MOVE_SPEED = 1.2, ANIM_SPEED = 0.09;
       for (const id in clientPlayers) {
         const p = clientPlayers[id];
         let isMoving = false;
