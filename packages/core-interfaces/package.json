@@ -1,0 +1,10 @@
+{
+  "name": "@alicization/core-interfaces",
+  "version": "1.0.0",
+  "description": "Public interface contracts for Alicization Town plugin system",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "keywords": ["alicization-town", "plugin", "interfaces"],
+  "author": "ceresOPA",
+  "license": "MIT"
+}
