@@ -1100,6 +1100,7 @@
     // ==========================================
     let zoneResourceData = {};  // zoneId → { category, zoneName, resources }
     let hoveredZoneName = null; // 当前鼠标悬停的 zone 名称
+    let rpgPluginAvailable = null; // null=未知, true=可用, false=不可用
 
     // 判断 zone 名称是否属于有资源的类型
     const RESOURCE_ZONE_PATTERNS = [
@@ -1113,9 +1114,13 @@
     // 拉取 zone 资源数据（静默失败，插件未加载时不影响）
     function fetchZoneResources() {
       fetch('/api/rpg/zones/resources')
-        .then(r => r.ok ? r.json() : null)
+        .then(r => {
+          if (r.ok) { rpgPluginAvailable = true; return r.json(); }
+          rpgPluginAvailable = false;
+          return null;
+        })
         .then(data => { if (data) zoneResourceData = data; })
-        .catch(() => {});
+        .catch(() => { rpgPluginAvailable = false; });
     }
     // 启动后定时刷新资源数据
     fetchZoneResources();
@@ -1157,7 +1162,14 @@
       titleEl.textContent = zoneName;
       msgEl.textContent = '';
 
-      if (!resInfo) {
+      if (rpgPluginAvailable === false) {
+        // 插件未加载，引导用户
+        contentEl.innerHTML = '<div style="color:#888;font-size:13px;line-height:1.6;">'
+          + '此功能需要 <b>RPG Advanced</b> 插件支持。<br>'
+          + '请联系作者获取插件：<br>'
+          + '<a href="https://github.com/ceresOPA/Alicization-Town" target="_blank" style="color:#e67e22;">GitHub - Alicization Town</a>'
+          + '</div>';
+      } else if (!resInfo) {
         contentEl.innerHTML = '<div style="color:#999;font-size:13px;">资源数据加载中…</div>';
         contentEl.innerHTML += `<button class="zone-supply-btn" disabled>补充</button>`;
       } else {
