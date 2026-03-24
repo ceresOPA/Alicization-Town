@@ -42,6 +42,7 @@ class NpcBehavior {
             chat: (id, text) => this.engine.chat(id, text),
             move: (id, target) => this.engine.move(id, target),
             interact: (id) => this.engine.interact(id),
+            readMap: () => this.engine.readMap(),
           },
           greetHistory: this.lastGreetedPlayers,
         });
