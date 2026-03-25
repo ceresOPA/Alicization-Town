@@ -399,6 +399,9 @@
               clientPlayers[id].currentZoneName = sp.currentZoneName;
               clientPlayers[id].lastActionAt = sp.lastActionAt;
               clientPlayers[id].lastHeartbeatAt = sp.lastHeartbeatAt;
+              clientPlayers[id].level = sp.level;
+              clientPlayers[id].hp = sp.hp;
+              clientPlayers[id].max_hp = sp.max_hp;
               if (sp.interactionSound && !clientPlayers[id]._lastSound) {
                 clientPlayers[id]._lastSound = sp.interactionSound;
                 if (sfxEnabled && sfx[sp.interactionSound]) sfx[sp.interactionSound].cloneNode().play().catch(() => {});
@@ -810,6 +813,35 @@
           ctx.textAlign='center'; ctx.textBaseline='middle';
           ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.strokeStyle=idle?'rgba(26,26,46,0.55)':'rgba(26,26,46,0.9)'; ctx.strokeText(p.name,cx2,nameY);
           ctx.fillStyle=p.name==='Observer'?'#f1c40f':(idle?'rgba(255,255,255,0.72)':'#ffffff'); ctx.fillText(p.name,cx2,nameY);
+
+          // 等级标签：显示在名字右侧
+          if (p.level != null) {
+            const nameHalfW = ctx.measureText(p.name).width / 2;
+            ctx.font = 'bold 9px "Pixelify Sans","Comic Sans MS",sans-serif';
+            ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            const lvText = `Lv.${p.level}`;
+            ctx.lineWidth = 1.5; ctx.strokeStyle = idle ? 'rgba(26,26,46,0.55)' : 'rgba(26,26,46,0.9)';
+            ctx.strokeText(lvText, cx2 + nameHalfW + 2, nameY);
+            ctx.fillStyle = '#f9ca24';
+            ctx.fillText(lvText, cx2 + nameHalfW + 2, nameY);
+            ctx.textAlign = 'center';
+          }
+
+          // HP 血条：显示在角色贴图正下方
+          if (p.hp != null && p.max_hp) {
+            const barW = Math.round(TILE_SIZE * 1.2);
+            const barH = 3;
+            const barX = sx;
+            const barY = Math.round(sy - 10 + TILE_SIZE * 1.2) + 2;
+            const ratio = Math.max(0, Math.min(1, p.hp / p.max_hp));
+            const hpColor = ratio > 0.5 ? '#00b894' : ratio > 0.25 ? '#fdcb6e' : '#d63031';
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.beginPath(); ctx.roundRect(barX, barY, barW, barH, 1.5); ctx.fill();
+            if (ratio > 0) {
+              ctx.fillStyle = hpColor;
+              ctx.beginPath(); ctx.roundRect(barX, barY, Math.max(1, Math.round(barW * ratio)), barH, 1.5); ctx.fill();
+            }
+          }
 
           const bubbleY=sy-27+floatY;
           ctx.textAlign='center'; ctx.textBaseline='middle';

@@ -177,6 +177,9 @@ function sanitize(player) {
     lastActionAt: player.lastActionAt || null,
     lastHeartbeatAt: player.lastHeartbeatAt || null,
     presenceState: getPresenceState(player),
+    level: player.level ?? 1,
+    hp: player.hp ?? 100,
+    max_hp: player.max_hp ?? 100,
   };
 }
 
@@ -431,6 +434,10 @@ function join(playerId, name, sprite, options = {}) {
     lastHeartbeatAt: now,
     lastActionAt: options.trackActivity === false ? null : now,
     lastChatCursor: nextChatCursor,
+    // RPG 基础属性（等待 Issue #12 接入完整数据模型前使用默认值）
+    level: 1,
+    hp: 100,
+    max_hp: 100,
   };
   addActivity(playerId, { type: 'join', text: `加入了小镇 (角色: ${assignedSprite})` });
   emitPerception('join', playerId, name, spawnX, spawnY, { sprite: assignedSprite });
