@@ -256,6 +256,70 @@
           to { transform: translateY(0); }
         }
       }
+
+      /* Shrine ghost stories */
+      .shrine-stories {
+        padding: 8px;
+        max-height: 180px;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #5a3a6a transparent;
+      }
+      .shrine-empty {
+        color: #7a6a8a;
+        font-size: 13px;
+        padding: 16px;
+        text-align: center;
+        line-height: 1.6;
+      }
+      .shrine-story {
+        padding: 6px 0;
+        border-bottom: 1px solid rgba(120,90,150,0.2);
+      }
+      .shrine-story-text {
+        color: #d4c8e0;
+        font-size: 13px;
+        line-height: 1.4;
+        display: block;
+      }
+      .shrine-story-meta {
+        color: #6a5a7a;
+        font-size: 10px;
+        display: block;
+        margin-top: 2px;
+      }
+      .shrine-input-row {
+        display: flex;
+        gap: 4px;
+        padding: 6px 8px 8px;
+        border-top: 1px solid #3a2a44;
+      }
+      .shrine-input {
+        flex: 1;
+        background: #1a1024;
+        border: 1px solid #5a3a6a;
+        border-radius: 3px;
+        color: #d4c8e0;
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 12px;
+        padding: 4px 8px;
+        outline: none;
+      }
+      .shrine-input:focus { border-color: #8a6aaa; }
+      .shrine-input::placeholder { color: #5a4a6a; }
+      .shrine-submit {
+        background: linear-gradient(180deg, #6a4a8a 0%, #4a2a6a 100%);
+        border: 1px solid #5a3a7a;
+        border-radius: 3px;
+        color: #e0d4f0;
+        font-family: 'Pixelify Sans', sans-serif;
+        font-size: 12px;
+        padding: 4px 10px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .shrine-submit:hover { background: linear-gradient(180deg, #7a5a9a 0%, #5a3a7a 100%); }
+      .shrine-submit:disabled { opacity: 0.5; cursor: not-allowed; }
     </style>
     <div class="zone-popup-titlebar"><span id="zone-popup-title"></span></div>
     <button class="zone-close" onclick="closeZonePopup()">&times;</button>

@@ -29,7 +29,16 @@ async function handle(name, args, client) {
     }
   } catch {}
 
-  return { content: [{ type: 'text', text: client.formatInteract(result) + perceptionText + attrText }] };
+  // 神社怪谈：如果在神社交互，附加怪谈内容
+  let shrineText = '';
+  if (result.ghostStories && result.ghostStories.length > 0) {
+    shrineText = '\n\n👻 【神社怪谈板】\n';
+    for (const s of result.ghostStories) {
+      shrineText += `• "${s.text}" — ${s.author}\n`;
+    }
+  }
+
+  return { content: [{ type: 'text', text: client.formatInteract(result) + shrineText + perceptionText + attrText }] };
 }
 
 module.exports = { definitions, handle };

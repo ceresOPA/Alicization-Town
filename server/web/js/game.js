@@ -178,10 +178,14 @@
         if (hoveredPlayerId && clientPlayers[hoveredPlayerId]) {
           selectAndFollowPlayer(hoveredPlayerId);
         } else {
-          // Check if clicked on a resource zone
+          // Check if clicked on a clickable zone
           const clickedZone = getZoneAtMouse();
-          if (clickedZone && isResourceZone(clickedZone.name)) {
-            showZonePopup(clickedZone.name, e.clientX, e.clientY);
+          if (clickedZone && isClickableZone(clickedZone.name)) {
+            if (isShrineZone(clickedZone.name)) {
+              showShrinePopup(clickedZone.name, e.clientX, e.clientY);
+            } else {
+              showZonePopup(clickedZone.name, e.clientX, e.clientY);
+            }
           } else {
             closeZonePopup();
             isCameraFollowing = false;
@@ -890,7 +894,7 @@
           const sx2=TILE_SIZE/mapData.tilewidth,sy2=TILE_SIZE/mapData.tileheight;
           const rx=zone.x*sx2,ry=zone.y*sy2,rw=zone.width*sx2,rh=zone.height*sy2;
           if(mouseX>=rx&&mouseX<=rx+rw&&mouseY>=ry&&mouseY<=ry+rh){
-            const isResZone = isResourceZone(zone.name);
+            const isResZone = isClickableZone(zone.name);
             const suffix = isResZone ? ' [点击查看]' : '';
             ctx.font='bold 16px "Pixelify Sans",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
             const nameText = zone.name + suffix;
@@ -1120,6 +1124,16 @@
       return RESOURCE_ZONE_PATTERNS.some(p => p.test(name || ''));
     }
 
+    // 判断是否为神社区域
+    function isShrineZone(name) {
+      return /shrine|神社/i.test(name || '');
+    }
+
+    // 判断是否可以弹出面板的区域（资源区 + 神社）
+    function isClickableZone(name) {
+      return isResourceZone(name) || isShrineZone(name);
+    }
+
     // 拉取 zone 资源数据（静默失败，插件未加载时不影响）
     function fetchZoneResources() {
       fetch('/api/rpg/zones/resources')
@@ -1317,6 +1331,91 @@
         .finally(() => {
           slotEl.dataset.busy = '0';
         });
+    }
+
+    // === 神社怪谈 Popup ===
+    function showShrinePopup(zoneName, screenX, screenY) {
+      const popup = document.getElementById('zone-popup');
+      const titleEl = document.getElementById('zone-popup-title');
+      const contentEl = document.getElementById('zone-popup-content');
+      const msgEl = document.getElementById('zone-popup-msg');
+      if (!popup || !titleEl || !contentEl) return;
+
+      titleEl.textContent = zoneName + ' — 怪谈板';
+      if (msgEl) msgEl.textContent = '';
+
+      contentEl.innerHTML = '<div class="zone-inv-empty">加载中…</div>';
+
+      // Position popup first
+      popup.style.display = 'block';
+      const isMobile = window.innerWidth <= 600;
+      if (isMobile) {
+        popup.style.left = ''; popup.style.top = '';
+      } else {
+        const popW = popup.offsetWidth, popH = popup.offsetHeight;
+        let left = screenX + 12, top = screenY - popH / 2;
+        if (left + popW > window.innerWidth - 10) left = screenX - popW - 12;
+        if (top < 10) top = 10;
+        if (top + popH > window.innerHeight - 10) top = window.innerHeight - popH - 10;
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+      }
+
+      fetch('/api/shrine/stories')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { renderShrineContent(contentEl, msgEl, data ? data.stories : []); })
+        .catch(() => { renderShrineContent(contentEl, msgEl, []); });
+    }
+
+    function renderShrineContent(contentEl, msgEl, stories) {
+      let html = '<div class="shrine-stories">';
+      if (stories.length === 0) {
+        html += '<div class="shrine-empty">还没有怪谈…<br>成为第一个讲述者吧</div>';
+      } else {
+        for (const s of stories) {
+          const t = new Date(s.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          html += '<div class="shrine-story">';
+          html += `<span class="shrine-story-text">${escapeHtml(s.text)}</span>`;
+          html += `<span class="shrine-story-meta">— ${escapeHtml(s.author)} ${t}</span>`;
+          html += '</div>';
+        }
+      }
+      html += '</div>';
+      html += '<div class="shrine-input-row">';
+      html += '<input class="shrine-input" type="text" maxlength="200" placeholder="写下你的怪谈…">';
+      html += '<button class="shrine-submit">投稿</button>';
+      html += '</div>';
+      contentEl.innerHTML = html;
+
+      const input = contentEl.querySelector('.shrine-input');
+      const btn = contentEl.querySelector('.shrine-submit');
+      function submitStory() {
+        const text = (input.value || '').trim();
+        if (!text) return;
+        btn.disabled = true;
+        fetch('/api/shrine/stories', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data && data.ok) {
+              renderShrineContent(contentEl, msgEl, data.stories);
+              if (msgEl) { msgEl.textContent = '怪谈已记录'; setTimeout(() => { msgEl.textContent = ''; }, 2000); }
+            } else {
+              if (msgEl) msgEl.textContent = '投稿失败';
+            }
+          })
+          .catch(() => { if (msgEl) msgEl.textContent = '请求失败'; })
+          .finally(() => { btn.disabled = false; });
+      }
+      btn.addEventListener('click', submitStory);
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitStory(); });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // 暴露到全局作用域（供 HTML onclick 调用）

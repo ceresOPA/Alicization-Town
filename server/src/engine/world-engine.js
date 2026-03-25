@@ -33,6 +33,9 @@ let lastSnowflakeTimestamp = 0;
 let snowflakeSequence = 0;
 let nextChatCursor = 0;
 
+const MAX_GHOST_STORIES = 5;
+let ghostStories = []; // { text, author, time }
+
 const players = {};
 const chatHistory = [];
 const playerActivities = {};
@@ -697,7 +700,12 @@ function interact(playerId, item) {
   };
   events.emit('interaction', entry);
   addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });
-  return { zone: zone ? zone.name : '小镇街道', ...result };
+  const response = { zone: zone ? zone.name : '小镇街道', ...result };
+  // 神社：附加怪谈列表
+  if (zone && isShrineZone(zone.name)) {
+    response.ghostStories = getGhostStories();
+  }
+  return response;
 }
 
 function look(playerId) {
@@ -749,6 +757,27 @@ function sanitizeAllPlayers() {
   return result;
 }
 
+// ── 神社怪谈 ─────────────────────────────────────────────────────────────────
+function getGhostStories() {
+  return ghostStories.slice();
+}
+
+function addGhostStory(text, author) {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim().slice(0, 200);
+  if (!trimmed) return null;
+  const story = { text: trimmed, author: author || '匿名旅人', time: Date.now() };
+  ghostStories.push(story);
+  if (ghostStories.length > MAX_GHOST_STORIES) {
+    ghostStories = ghostStories.slice(-MAX_GHOST_STORIES);
+  }
+  return story;
+}
+
+function isShrineZone(zoneName) {
+  return /shrine|神社/i.test(zoneName || '');
+}
+
 module.exports = {
   init,
   events,
@@ -781,4 +810,7 @@ module.exports = {
   refreshZoneInfo,
   recordPluginActivity,
   shutdown,
+  getGhostStories,
+  addGhostStory,
+  isShrineZone,
 };

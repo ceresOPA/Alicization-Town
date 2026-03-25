@@ -190,6 +190,21 @@ router.get('/chat', maybeSession, (req, res) => {
   res.json({ messages: filtered, cursor });
 });
 
+// ── 神社怪谈 ─────────────────────────────────────────────────────────────────
+router.get('/shrine/stories', (_req, res) => {
+  res.json({ stories: worldEngine.getGhostStories() });
+});
+
+router.post('/shrine/stories', (req, res) => {
+  const { text, author } = req.body || {};
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    return res.status(400).json({ error: '缺少 text 字段' });
+  }
+  const story = worldEngine.addGhostStory(text, author);
+  if (!story) return res.status(400).json({ error: '无效的怪谈内容' });
+  res.json({ ok: true, story, stories: worldEngine.getGhostStories() });
+});
+
 // ── 插件信息端点 ─────────────────────────────────────────────────────────────
 router.get('/plugins', (_req, res) => {
   const pluginManager = _req.app.locals.pluginManager;
