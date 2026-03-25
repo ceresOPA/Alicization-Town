@@ -666,7 +666,7 @@ function chat(playerId, text) {
   return { ok: true };
 }
 
-function interact(playerId) {
+function interact(playerId, item) {
   const player = players[playerId];
   if (!player) return null;
   touchAction(playerId);
@@ -693,6 +693,7 @@ function interact(playerId) {
     zone: zone ? zone.name : '小镇街道',
     action: result.action,
     result: result.result,
+    item: item || null,
   };
   events.emit('interaction', entry);
   addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });

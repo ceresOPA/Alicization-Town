@@ -125,7 +125,8 @@ router.post('/chat', requireSession, async (req, res) => {
 router.post('/interact', requireSession, async (req, res) => {
   const release = await actionLock.acquire(req.requestHandle.playerId);
   try {
-    const result = worldEngine.interact(req.requestHandle.playerId);
+    const { item } = req.body || {};
+    const result = worldEngine.interact(req.requestHandle.playerId, item || null);
     if (!result) return res.status(404).json({ error: '玩家不存在' });
     res.json({ ...result, perceptions: req.drainPerceptions(), newMessages: req.drainNewMessages() });
   } finally { release(); }

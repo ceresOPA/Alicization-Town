@@ -121,8 +121,9 @@ async function sendChat(text) {
   return authenticatedRequest('POST', '/api/chat', { text });
 }
 
-async function interact() {
-  return authenticatedRequest('POST', '/api/interact');
+async function interact(item) {
+  const body = item ? { item } : undefined;
+  return authenticatedRequest('POST', '/api/interact', body);
 }
 
 async function setThinking(isThinking) {
