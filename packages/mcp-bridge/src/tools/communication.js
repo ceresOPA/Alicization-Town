@@ -40,7 +40,30 @@ async function handle(name, args, client) {
       return { content: [{ type: 'text', text: auth?.message || '当前还没有可用 profile，请先 login。' }] };
     }
     const perceptionText = client.formatPerceptions(result.perceptions);
-    return { content: [{ type: 'text', text: client.formatLook(result) + perceptionText }] };
+
+    // 如果当前在资源区域，附加资源库存信息
+    let resourceText = '';
+    if (result.player?.zone) {
+      const zoneRes = await client.getZoneResources(result.player.zone);
+      if (zoneRes && zoneRes.hasResources && zoneRes.resources) {
+        resourceText = '\n\n🏪 【当前区域资源】\n';
+        const available = zoneRes.resources.filter(r => r.current > 0);
+        const empty = zoneRes.resources.filter(r => r.current <= 0);
+        if (available.length > 0) {
+          for (const r of available) {
+            resourceText += `  • ${r.label}: ${r.current}${r.unit}剩余\n`;
+          }
+        }
+        if (empty.length > 0) {
+          resourceText += `  ⚠️ 已售罄: ${empty.map(r => r.label).join('、')}\n`;
+        }
+        if (available.length === 0) {
+          resourceText += '  ⚠️ 所有物品已售罄，需要用户补充！\n';
+        }
+      }
+    }
+
+    return { content: [{ type: 'text', text: client.formatLook(result) + resourceText + perceptionText }] };
   }
 
   return null;

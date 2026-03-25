@@ -150,6 +150,33 @@ async function getRpgAttrs() {
 }
 
 /**
+ * 查询指定区域的资源库存（RPG 插件，优雅降级）
+ * @param {string} zoneName - 区域名称
+ * @returns {object|null} { hasResources, available, resources, zoneName, zoneId, category } or null
+ */
+async function getZoneResources(zoneName) {
+  try {
+    const { result } = await authenticatedRequest('GET', `/api/rpg/zone-check?zone=${encodeURIComponent(zoneName)}`);
+    return result || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 查询所有区域的资源库存（RPG 插件，优雅降级）
+ * @returns {object|null} { [zoneId]: { zoneName, resources: { [type]: { label, current, max, unit } } } }
+ */
+async function getAllZoneResources() {
+  try {
+    const { result } = await authenticatedRequest('GET', '/api/rpg/zones/resources');
+    return result || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 格式化 RPG 属性数据为可读文本
  */
 function formatRpgAttrs(data) {
@@ -225,6 +252,8 @@ module.exports = {
   flushContext,
   setThinking,
   getRpgAttrs,
+  getZoneResources,
+  getAllZoneResources,
   stringifyResult: townClient.stringifyResult,
   formatLogin: townClient.formatLogin,
   formatProfilesList: townClient.formatProfilesList,
