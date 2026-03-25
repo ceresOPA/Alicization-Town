@@ -1112,15 +1112,15 @@
           const sx2=TILE_SIZE/mapData.tilewidth,sy2=TILE_SIZE/mapData.tileheight;
           const rx=zone.x*sx2,ry=zone.y*sy2,rw=zone.width*sx2,rh=zone.height*sy2;
           if(mouseX>=rx&&mouseX<=rx+rw&&mouseY>=ry&&mouseY<=ry+rh){
-            const isResourceZone = inferRpgCategory(zone.name) !== null;
-            const suffix = isResourceZone ? ' [点击查看]' : '';
+            const isResZone = isResourceZone(zone.name);
+            const suffix = isResZone ? ' [点击查看]' : '';
             ctx.font='bold 16px "Pixelify Sans",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
             const nameText = zone.name + suffix;
-            const tw=ctx.measureText(nameText).width+20,th=35,tx=mouseX-15,ty=mouseY-30;
+            const tw=ctx.measureText(nameText).width+20,th=isResZone?42:35,tx=mouseX-15,ty=mouseY-30;
             ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.roundRect(tx,ty,tw,th,8); ctx.fill();
-            ctx.strokeStyle=isResourceZone?'#e67e22':'#f39c12'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
-            ctx.fillStyle='#5c4a3d'; ctx.fillText(zone.name,tx+tw/2,ty+th/2 - (isResourceZone?6:0));
-            if(isResourceZone){
+            ctx.strokeStyle=isResZone?'#e67e22':'#f39c12'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+            ctx.fillStyle='#5c4a3d'; ctx.fillText(zone.name,tx+tw/2,ty+th/2-(isResZone?8:0));
+            if(isResZone){
               ctx.font='11px "Pixelify Sans",sans-serif'; ctx.fillStyle='#e67e22';
               ctx.fillText('[点击查看]',tx+tw/2,ty+th/2+10);
             }
@@ -1336,6 +1336,7 @@
     const RESOURCE_ZONE_PATTERNS = [
       /面馆|noodle|restaurant/i,
       /集市|market/i,
+      /药水|potion|magic|魔药/i,
     ];
     function isResourceZone(name) {
       return RESOURCE_ZONE_PATTERNS.some(p => p.test(name || ''));
@@ -1356,10 +1357,26 @@
     fetchZoneResources();
     setInterval(fetchZoneResources, 10000);
 
-    // 根据 zone 名称查找对应的资源数据
+    // 根据 zone 名称查找对应的资源数据（先精确匹配，再按类别模糊匹配）
     function findResourceByZoneName(zoneName) {
+      // 精确匹配
       for (const [zoneId, data] of Object.entries(zoneResourceData)) {
         if (data.zoneName === zoneName) return { zoneId, ...data };
+      }
+      // 模糊匹配：用 RESOURCE_ZONE_PATTERNS 推断类别
+      const CATEGORY_MAP = [
+        [/面馆|noodle|restaurant/i, 'restaurant'],
+        [/集市|market/i, 'marketplace'],
+        [/药水|potion|magic|魔药/i, 'potion'],
+      ];
+      let targetCat = null;
+      for (const [pat, cat] of CATEGORY_MAP) {
+        if (pat.test(zoneName)) { targetCat = cat; break; }
+      }
+      if (targetCat) {
+        for (const [zoneId, data] of Object.entries(zoneResourceData)) {
+          if (data.category === targetCat) return { zoneId, ...data };
+        }
       }
       return null;
     }
@@ -1400,8 +1417,29 @@
           + '<a href="https://github.com/ceresOPA/Alicization-Town" target="_blank" style="color:#e67e22;">GitHub - Alicization Town</a>'
           + '</div>';
       } else if (!resInfo) {
-        contentEl.innerHTML = '<div style="color:#999;font-size:13px;">资源数据加载中…</div>';
-        contentEl.innerHTML += `<button class="zone-supply-btn" disabled>补充</button>`;
+        // 插件已加载但尚未发现此区域的资源（可能还在初始化）
+        // 尝试主动拉取一次数据，避免永久加载
+        const hasAnyData = Object.keys(zoneResourceData).length > 0;
+        if (hasAnyData) {
+          // 有数据但没有匹配到此区域 → 该区域确实无资源
+          contentEl.innerHTML = '<div style="color:#999;font-size:13px;">该区域暂无可用资源</div>';
+        } else {
+          // 完全没有数据 → 可能还在初始化中，尝试再拉取一次
+          contentEl.innerHTML = '<div style="color:#999;font-size:13px;">资源数据加载中…</div>';
+          fetchZoneResources();
+          // 2 秒后如果还是没数据，更新提示
+          setTimeout(() => {
+            const retryInfo = findResourceByZoneName(zoneName);
+            if (retryInfo) {
+              showZonePopup(zoneName, screenX, screenY);
+            } else if (contentEl) {
+              const stillEmpty = Object.keys(zoneResourceData).length === 0;
+              contentEl.innerHTML = stillEmpty
+                ? '<div style="color:#999;font-size:13px;">资源系统尚未就绪，请稍后再试</div>'
+                : '<div style="color:#999;font-size:13px;">该区域暂无可用资源</div>';
+            }
+          }, 2500);
+        }
       } else {
         let html = '';
         for (const [key, res] of Object.entries(resInfo.resources)) {
