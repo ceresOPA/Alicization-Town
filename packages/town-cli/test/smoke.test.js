@@ -20,6 +20,10 @@ function createMockServer() {
   const profiles = new Map();
   const tokens = new Map();
   const activeTokens = new Map();
+  const state = {
+    lookMode: 'busy',
+    recallRequests: [],
+  };
   let sequence = 1000n;
 
   return new Promise((resolve) => {
@@ -117,6 +121,13 @@ function createMockServer() {
             return;
           }
           const session = tokens.get(auth);
+          if (state.lookMode === 'eligible') {
+            res.end(JSON.stringify({
+              player: { x: 5, y: 5, zone: 'Town Center', zoneDesc: 'Central square', sprite: session.sprite, name: session.name },
+              nearby: [{ id: 'npc-alice', name: 'Alice', distance: 2, relativeDirection: '左侧', zone: 'Town Center', message: null }],
+            }));
+            return;
+          }
           res.end(JSON.stringify({
             player: { x: 5, y: 5, zone: 'Town Center', zoneDesc: 'Central square', sprite: session.sprite, name: session.name },
             nearby: [{ name: 'Alice', distance: 2, relativeDirection: '左侧', zone: 'Town Center', message: 'hello' }],
@@ -160,6 +171,20 @@ function createMockServer() {
           return;
         }
 
+        if (req.url === '/api/memories/recall' && req.method === 'POST') {
+          if (!auth || !tokens.has(auth)) {
+            res.statusCode = 401;
+            res.end(JSON.stringify({ error: 'unauthorized' }));
+            return;
+          }
+          state.recallRequests.push(payload);
+          const memories = payload.location === 'Town Center'
+            ? [{ id: 'cli-town', content: 'You recently coordinated with someone in Town Center.' }]
+            : [{ id: 'cli-general', content: 'You remember the town rewards revisiting important places.' }];
+          res.end(JSON.stringify({ memories: memories.slice(0, payload.limit || memories.length) }));
+          return;
+        }
+
         if (req.url === '/api/logout' && req.method === 'POST') {
           if (auth) tokens.delete(auth);
           res.end(JSON.stringify({ ok: true }));
@@ -171,6 +196,7 @@ function createMockServer() {
       });
     });
 
+    server.testState = state;
     server.listen(MOCK_PORT, () => resolve(server));
   });
 }
@@ -230,11 +256,25 @@ describe('Town CLI (smoke)', () => {
 
     const map = await runCli(['map'], env);
     assert.match(map.stdout, /Town Center/);
+    assert.doesNotMatch(map.stdout, /Relevant memories/);
+    assert.equal(mockServer.testState.recallRequests.length, 0);
 
     const look = await runCli(['look'], env);
     assert.match(look.stdout, /位置感知/);
     assert.match(look.stdout, /Alice/);
     assert.match(look.stdout, /左侧/);
+    assert.doesNotMatch(look.stdout, /Relevant memories/);
+    assert.equal(mockServer.testState.recallRequests.length, 0);
+
+    mockServer.testState.lookMode = 'eligible';
+    const eligibleLook = await runCli(['look'], env);
+    assert.match(eligibleLook.stdout, /Relevant memories/);
+    assert.equal(mockServer.testState.recallRequests.length, 1);
+    assert.deepEqual(mockServer.testState.recallRequests[0], {
+      partnerId: 'npc-alice',
+      location: 'Town Center',
+      limit: 2,
+    });
 
     const walk = await runCli(['walk', '--to', 'town_center#0001'], env);
     assert.match(walk.stdout, /已到达/);
@@ -243,7 +283,13 @@ describe('Town CLI (smoke)', () => {
     assert.match(chatResult.stdout, /你说: 你好/);
 
     const interact = await runCli(['interact'], env);
+    assert.match(interact.stdout, /Relevant memories/);
     assert.match(interact.stdout, /互动/);
+    assert.equal(mockServer.testState.recallRequests.length, 2);
+    assert.deepEqual(mockServer.testState.recallRequests[1], {
+      location: 'Town Center',
+      limit: 2,
+    });
 
     const logout = await runCli(['logout'], env);
     assert.equal(JSON.parse(logout.stdout).ok, true);

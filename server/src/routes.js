@@ -131,6 +131,29 @@ router.post('/interact', requireSession, async (req, res) => {
   } finally { release(); }
 });
 
+router.post('/memories/recall', requireSession, async (req, res) => {
+  const { partnerId, location, since, limit } = req.body || {};
+  const numericSince = since == null ? null : Number(since);
+  const numericLimit = limit == null ? undefined : Number(limit);
+  if (since != null && !Number.isFinite(numericSince)) {
+    return res.status(400).json({ error: 'since must be a finite timestamp' });
+  }
+  if (limit != null && !Number.isFinite(numericLimit)) {
+    return res.status(400).json({ error: 'limit must be a finite number' });
+  }
+  const release = await actionLock.acquire(req.requestHandle.playerId);
+  try {
+    const memories = worldEngine.recallMemories(req.requestHandle.playerId, {
+      partnerId: typeof partnerId === 'string' && partnerId ? partnerId : null,
+      location: typeof location === 'string' && location ? location : null,
+      since: numericSince,
+      limit: numericLimit,
+    });
+    if (!memories) return res.status(404).json({ error: 'player not found' });
+    res.json({ memories });
+  } finally { release(); }
+});
+
 router.put('/status', requireSession, async (req, res) => {
   const release = await actionLock.acquire(req.requestHandle.playerId);
   try {

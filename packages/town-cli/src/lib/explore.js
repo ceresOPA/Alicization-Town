@@ -1,4 +1,4 @@
-const { runAuthenticated, formatLook, formatMap } = require('./core');
+const { runAuthenticated, formatLook, formatMap, appendAutoMemories, appendMemorySection } = require('./core');
 
 function throwForAuth(auth) {
   if (!auth) return;
@@ -8,7 +8,18 @@ function throwForAuth(auth) {
 async function look() {
   const { auth, result } = await runAuthenticated('GET', '/api/look');
   if (!result) throwForAuth(auth);
-  console.log(formatLook(result));
+  let text = formatLook(result);
+  text = await appendAutoMemories(
+    'look',
+    result,
+    text,
+    async (memoryContext) => {
+      const recalled = await runAuthenticated('POST', '/api/memories/recall', memoryContext);
+      return recalled.result?.memories || [];
+    },
+    appendMemorySection,
+  );
+  console.log(text);
 }
 
 async function map() {

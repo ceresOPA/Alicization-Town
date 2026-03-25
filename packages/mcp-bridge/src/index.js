@@ -19,6 +19,20 @@ const mcpServer = new Server(
   { capabilities: { tools: {} } },
 );
 
+async function injectRelevantMemories(result) {
+  if (!result?.memoryContext) return result;
+  const memoryContext = result.memoryContext;
+  delete result.memoryContext;
+  if (result.content?.[0]?.type !== 'text') return result;
+  try {
+    const { auth, result: memories } = await client.recallMemories(memoryContext);
+    if (!auth && memories && memories.length > 0) {
+      result.content[0].text = client.appendMemorySection(result.content[0].text, memories);
+    }
+  } catch {}
+  return result;
+}
+
 mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: allDefinitions }));
 
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -32,6 +46,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     for (const module of toolModules) {
       const result = await module.handle(name, args || {}, client);
       if (result) {
+        await injectRelevantMemories(result);
         // Injection layer: append new messages from other players
         const newMessages = client.flushContext();
         if (newMessages.length > 0 && result.content?.[0]?.type === 'text') {

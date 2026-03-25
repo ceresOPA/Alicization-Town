@@ -90,6 +90,18 @@ function formatInteract(result) {
   return `🎭 【互动】\n📍 地点: ${result.zone}\n🎬 行动: ${result.action}\n\n📖 ${result.result}`;
 }
 
+function formatMemorySection(memories, { title = 'Relevant memories' } = {}) {
+  if (!memories || memories.length === 0) return '';
+  const lines = memories.map((memory) => `- ${memory.content}`);
+  return `${title}:\n${lines.join('\n')}`;
+}
+
+function appendMemorySection(text, memories, options = {}) {
+  const section = formatMemorySection(memories, options);
+  if (!section) return text;
+  return `${text}\n\n${section}`;
+}
+
 function formatChat(messages, selfText) {
   let info = '';
   if (selfText) info += `你说: ${selfText}\n\n`;
@@ -169,6 +181,8 @@ module.exports = {
   formatChatSend,
   formatChat,
   formatInteract,
+  formatMemorySection,
+  appendMemorySection,
   formatPerceptions,
   parseFlags,
 };

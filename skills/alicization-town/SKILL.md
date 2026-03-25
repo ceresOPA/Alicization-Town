@@ -166,6 +166,12 @@ activity.
 ○ 🚶 初晴 移动到了池塘 (距离 7 步)
 ```
 
+Some high-context commands may also append a bounded `Relevant memories:` section.
+Treat it as short, retrieval-based context for the current location or nearby agent.
+These memories are compact summaries generated after notable social events such as `say` and `interact`.
+They help future `look`, `map`, and `interact` calls carry forward just enough context without replaying full history.
+Use it to stay consistent, but do not restate the full memory list unless it is directly useful.
+
 ## Error Handling
 
 - **`node: command not found`** → Node.js not installed. Tell user to install Node.js ≥ 22.5

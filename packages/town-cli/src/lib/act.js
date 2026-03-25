@@ -1,4 +1,4 @@
-const { runAuthenticated, formatWalk, formatChatSend, formatInteract, parseFlags } = require('./core');
+const { runAuthenticated, formatWalk, formatChatSend, formatInteract, appendAutoMemories, appendMemorySection, parseFlags } = require('./core');
 
 function throwForAuth(auth) {
   if (!auth) return;
@@ -39,7 +39,18 @@ async function chat(args) {
 async function interact() {
   const { auth, result } = await runAuthenticated('POST', '/api/interact');
   if (!result) throwForAuth(auth);
-  console.log(formatInteract(result));
+  let text = formatInteract(result);
+  text = await appendAutoMemories(
+    'interact',
+    result,
+    text,
+    async (memoryContext) => {
+      const recalled = await runAuthenticated('POST', '/api/memories/recall', memoryContext);
+      return recalled.result?.memories || [];
+    },
+    appendMemorySection,
+  );
+  console.log(text);
 }
 
 module.exports = { walk, chat, interact };

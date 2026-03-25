@@ -125,6 +125,11 @@ async function interact() {
   return authenticatedRequest('POST', '/api/interact');
 }
 
+async function recallMemories(options = {}) {
+  const { auth, result } = await authenticatedRequest('POST', '/api/memories/recall', options);
+  return { auth, result: result ? result.memories || [] : null };
+}
+
 async function setThinking(isThinking) {
   await authenticatedRequest('PUT', '/api/status', { isThinking });
 }
@@ -163,6 +168,7 @@ module.exports = {
   interact,
   getChat,
   flushContext,
+  recallMemories,
   setThinking,
   stringifyResult: townClient.stringifyResult,
   formatLogin: townClient.formatLogin,
@@ -174,5 +180,7 @@ module.exports = {
   formatChatSend: townClient.formatChatSend,
   formatChat: townClient.formatChat,
   formatInteract: townClient.formatInteract,
+  appendMemorySection: townClient.appendMemorySection,
+  buildAutoMemoryContext: townClient.buildAutoMemoryContext,
   formatPerceptions: townClient.formatPerceptions,
 };
