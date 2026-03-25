@@ -1195,55 +1195,58 @@
       msgEl.textContent = '';
 
       if (rpgPluginAvailable === false) {
-        // 插件未加载，引导用户
-        contentEl.innerHTML = '<div style="color:#888;font-size:13px;line-height:1.6;">'
-          + '此功能需要 <b>RPG Advanced</b> 插件支持。<br>'
-          + '请联系作者获取插件：<br>'
-          + '<a href="https://github.com/ceresOPA/Alicization-Town" target="_blank" style="color:#e67e22;">GitHub - Alicization Town</a>'
+        contentEl.innerHTML = '<div class="zone-inv-empty">'
+          + '此功能需要 <b>RPG Advanced</b> 插件<br>'
+          + '<a href="https://github.com/ceresOPA/Alicization-Town" target="_blank">GitHub</a>'
           + '</div>';
       } else if (!resInfo) {
-        // 插件已加载但尚未发现此区域的资源（可能还在初始化）
-        // 尝试主动拉取一次数据，避免永久加载
         const hasAnyData = Object.keys(zoneResourceData).length > 0;
         if (hasAnyData) {
-          // 有数据但没有匹配到此区域 → 该区域确实无资源
-          contentEl.innerHTML = '<div style="color:#999;font-size:13px;">该区域暂无可用资源</div>';
+          contentEl.innerHTML = '<div class="zone-inv-empty">该区域暂无可用资源</div>';
         } else {
-          // 完全没有数据 → 可能还在初始化中，尝试再拉取一次
-          contentEl.innerHTML = '<div style="color:#999;font-size:13px;">资源数据加载中…</div>';
+          contentEl.innerHTML = '<div class="zone-inv-empty">资源数据加载中…</div>';
           fetchZoneResources();
-          // 2 秒后如果还是没数据，更新提示
           setTimeout(() => {
             const retryInfo = findResourceByZoneName(zoneName);
             if (retryInfo) {
               showZonePopup(zoneName, screenX, screenY);
             } else if (contentEl) {
               const stillEmpty = Object.keys(zoneResourceData).length === 0;
-              contentEl.innerHTML = stillEmpty
-                ? '<div style="color:#999;font-size:13px;">资源系统尚未就绪，请稍后再试</div>'
-                : '<div style="color:#999;font-size:13px;">该区域暂无可用资源</div>';
+              contentEl.innerHTML = '<div class="zone-inv-empty">' + (stillEmpty
+                ? '资源系统尚未就绪，请稍后再试'
+                : '该区域暂无可用资源') + '</div>';
             }
           }, 2500);
         }
       } else {
-        let html = '';
+        // Inventory grid rendering
         const resEntries = Object.entries(resInfo.resources);
         if (resEntries.length === 0) {
-          html = '<div style="color:#999;font-size:13px;">该区域资源为空</div>';
+          contentEl.innerHTML = '<div class="zone-inv-empty">该区域资源为空</div>';
         } else {
+          let html = '<div class="zone-inv-grid">';
           for (const [key, res] of resEntries) {
-            const pct = res.dailyMax > 0 ? Math.round(res.current / res.dailyMax * 100) : 0;
-            const barColor = pct > 50 ? '#27ae60' : pct > 20 ? '#f39c12' : '#e74c3c';
-            html += `<div class="zone-res-row">`;
-            html += `  <span>${res.label}</span>`;
-            html += `  <span>${res.current} / ${res.dailyMax} ${res.unit}`;
-            html += `    <button class="zone-supply-btn" onclick="supplyZone('${resInfo.zoneId}','${key}',this)" style="margin-left:8px;padding:2px 10px;font-size:12px;">+1</button>`;
-            html += `  </span>`;
+            const iconName = res.icon || 'GoldCoin';
+            const countClass = res.current <= 0 ? 'zero' : '';
+            html += `<div class="zone-inv-slot" data-zone-id="${resInfo.zoneId}" data-res-key="${key}" title="点击补充 ${res.label}">`;
+            html += `  <img class="zone-inv-icon" src="assets/items/${iconName}.png" alt="${res.label}">`;
+            html += `  <span class="zone-inv-label">${res.label}</span>`;
+            html += `  <span class="zone-inv-count ${countClass}">&times;${res.current}</span>`;
+            html += `  <span class="zone-inv-plus">点击+1</span>`;
             html += `</div>`;
-            html += `<div class="zone-res-bar"><div class="zone-res-fill" style="width:${pct}%;background:${barColor}"></div></div>`;
           }
+          html += '</div>';
+          html += '<div class="zone-popup-footer">点击物品补充资源</div>';
+          contentEl.innerHTML = html;
+
+          // Bind click events on slots
+          contentEl.querySelectorAll('.zone-inv-slot').forEach(slot => {
+            slot.addEventListener('click', (e) => {
+              e.stopPropagation();
+              supplyZone(slot.dataset.zoneId, slot.dataset.resKey, slot);
+            });
+          });
         }
-        contentEl.innerHTML = html;
       }
 
       // 定位弹窗：移动端用底部抽屉（CSS 控制），桌面端靠近点击位置
@@ -1269,9 +1272,12 @@
       if (popup) popup.style.display = 'none';
     }
 
-    function supplyZone(zoneId, resourceType, btnEl) {
+    function supplyZone(zoneId, resourceType, slotEl) {
       const msgEl = document.getElementById('zone-popup-msg');
-      if (btnEl) { btnEl.disabled = true; btnEl.textContent = '…'; }
+      if (!slotEl) return;
+      // Prevent rapid clicks
+      if (slotEl.dataset.busy === '1') return;
+      slotEl.dataset.busy = '1';
 
       fetch(`/api/rpg/zones/${encodeURIComponent(zoneId)}/supply`, {
         method: 'POST',
@@ -1279,36 +1285,37 @@
         body: JSON.stringify({ resourceType: resourceType, amount: 1 }),
       })
         .then(r => {
-          if (!r.ok) return r.text().then(t => { throw new Error('HTTP ' + r.status); });
+          if (!r.ok) return r.text().then(() => { throw new Error('HTTP ' + r.status); });
           return r.json();
         })
         .then(data => {
           if (data.success) {
+            // Flash animation
+            slotEl.classList.remove('adding');
+            void slotEl.offsetWidth; // reflow to retrigger
+            slotEl.classList.add('adding');
+            // Update count in-place
+            const countEl = slotEl.querySelector('.zone-inv-count');
+            if (countEl) {
+              countEl.textContent = '\u00d7' + data.current;
+              countEl.classList.remove('zero');
+            }
+            // Update cache
+            if (zoneResourceData[zoneId]?.resources?.[resourceType]) {
+              zoneResourceData[zoneId].resources[resourceType].current = data.current;
+            }
             if (msgEl) msgEl.textContent = data.message || '补充成功！';
-            if (btnEl) { btnEl.textContent = '+1'; btnEl.disabled = false; }
-            // 刷新资源数据后重新渲染弹窗
-            fetch('/api/rpg/zones/resources')
-              .then(r => r.ok ? r.json() : null)
-              .then(fresh => {
-                if (fresh) {
-                  zoneResourceData = fresh;
-                  const zoneName = fresh[zoneId]?.zoneName;
-                  if (zoneName) {
-                    const p = document.getElementById('zone-popup');
-                    showZonePopup(zoneName, parseInt(p.style.left) || 100, parseInt(p.style.top) || 100);
-                  }
-                }
-              })
-              .catch(() => {});
+            setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 2000);
           } else {
             if (msgEl) msgEl.textContent = data.error || '补充失败';
-            if (btnEl) { btnEl.disabled = false; btnEl.textContent = '+1'; }
           }
         })
         .catch((err) => {
           console.error('[rpg] supply error:', err);
           if (msgEl) msgEl.textContent = '请求失败，请确认 RPG 插件已加载';
-          if (btnEl) { btnEl.disabled = false; btnEl.textContent = '+1'; }
+        })
+        .finally(() => {
+          slotEl.dataset.busy = '0';
         });
     }
 
