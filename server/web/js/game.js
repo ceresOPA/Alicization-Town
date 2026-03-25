@@ -80,6 +80,175 @@
     const activityDetailNameEl = document.getElementById('activity-detail-name');
     const activityLogEl = document.getElementById('activity-log');
 
+    // === Zone Resource Panel (RPG Plugin) ===
+    const zoneResourcePanel = document.getElementById('zone-resource-panel');
+    const zoneResourceTitle = document.getElementById('zone-resource-title');
+    const zoneResourceList = document.getElementById('zone-resource-list');
+    const zoneResourceEmpty = document.getElementById('zone-resource-empty');
+    const zoneResourceCloseBtn = document.getElementById('zone-resource-close');
+    let zoneResourceCache = {};       // cached /rpg/zones/resources data
+    let zoneResourceLastFetch = 0;
+    const ZONE_RESOURCE_FETCH_INTERVAL = 5000;
+
+    /** CATEGORY_PATTERNS mirrors the RPG plugin's zone→category mapping */
+    const RPG_CATEGORY_PATTERNS = [
+      [/面馆|noodle|restaurant/i, 'restaurant'],
+      [/集市|market/i, 'marketplace'],
+      [/药水|potion|magic|魔药/i, 'potion'],
+    ];
+
+    function inferRpgCategory(zoneName) {
+      if (!zoneName) return null;
+      for (const [pat, cat] of RPG_CATEGORY_PATTERNS) {
+        if (pat.test(zoneName)) return cat;
+      }
+      return null;
+    }
+
+    async function fetchZoneResources() {
+      try {
+        const resp = await fetch('/rpg/zones/resources');
+        if (resp.ok) {
+          zoneResourceCache = await resp.json();
+          zoneResourceLastFetch = Date.now();
+        }
+      } catch (e) { /* RPG plugin may not be loaded */ }
+    }
+
+    function findZoneAtWorldCoord(wx, wy) {
+      if (!mapData) return null;
+      const zl = mapData.layers.find(l => l.type === 'objectgroup');
+      if (!zl || !zl.objects) return null;
+      const sx = TILE_SIZE / mapData.tilewidth, sy = TILE_SIZE / mapData.tileheight;
+      for (const zone of zl.objects) {
+        const rx = zone.x * sx, ry = zone.y * sy;
+        const rw = zone.width * sx, rh = zone.height * sy;
+        if (wx >= rx && wx <= rx + rw && wy >= ry && wy <= ry + rh) return zone;
+      }
+      return null;
+    }
+
+    function showZoneResourcePanel(zone, screenX, screenY) {
+      const cat = inferRpgCategory(zone.name);
+      if (!cat) {
+        hideZoneResourcePanel();
+        return;
+      }
+
+      // Find matching inventory entry from cache
+      let zoneInv = null;
+      let zoneId = null;
+      for (const [id, inv] of Object.entries(zoneResourceCache)) {
+        if (inv.zoneName === zone.name || inv.category === cat) {
+          zoneInv = inv;
+          zoneId = id;
+          break;
+        }
+      }
+
+      if (!zoneInv) {
+        hideZoneResourcePanel();
+        return;
+      }
+
+      zoneResourceTitle.textContent = zone.name;
+      zoneResourceList.innerHTML = '';
+      zoneResourceEmpty.classList.add('hidden');
+
+      const resources = zoneInv.resources;
+      const resKeys = Object.keys(resources);
+      if (resKeys.length === 0) {
+        zoneResourceEmpty.classList.remove('hidden');
+      } else {
+        resKeys.forEach(key => {
+          const r = resources[key];
+          const pct = r.dailyMax > 0 ? (r.current / r.dailyMax) * 100 : 0;
+          const barClass = r.current <= 0 ? 'empty' : (pct <= 30 ? 'low' : '');
+          const countClass = r.current <= 0 ? 'depleted' : '';
+          const iconName = r.icon || 'GoldCoin';
+
+          const item = document.createElement('div');
+          item.className = 'zone-resource-item';
+          item.innerHTML = `
+            <img class="zone-resource-icon" src="assets/items/${iconName}.png" alt="${r.label}">
+            <div class="zone-resource-info">
+              <span class="zone-resource-name">${r.label}</span>
+              <span class="zone-resource-count ${countClass}">${r.current} / ${r.dailyMax} ${r.unit}</span>
+              <div class="zone-resource-bar"><div class="zone-resource-bar-fill ${barClass}" style="width:${pct}%"></div></div>
+            </div>
+            <button class="zone-resource-supply-btn" data-zone-id="${zoneId}" data-res-type="${key}">+1</button>
+          `;
+          zoneResourceList.appendChild(item);
+
+          // Supply button handler
+          const btn = item.querySelector('.zone-resource-supply-btn');
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            btn.disabled = true;
+            btn.textContent = '...';
+            try {
+              const resp = await fetch(`/rpg/zones/${zoneId}/supply`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ resourceType: key, amount: 1 }),
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                btn.textContent = '+1';
+                btn.classList.add('success');
+                setTimeout(() => btn.classList.remove('success'), 800);
+                // Update local cache and re-render count
+                if (zoneResourceCache[zoneId]) {
+                  zoneResourceCache[zoneId].resources[key].current = data.current;
+                }
+                const countEl = item.querySelector('.zone-resource-count');
+                const barEl = item.querySelector('.zone-resource-bar-fill');
+                countEl.textContent = `${data.current} / ${r.dailyMax} ${r.unit}`;
+                countEl.className = 'zone-resource-count' + (data.current <= 0 ? ' depleted' : '');
+                const newPct = r.dailyMax > 0 ? (data.current / r.dailyMax) * 100 : 0;
+                barEl.style.width = newPct + '%';
+                barEl.className = 'zone-resource-bar-fill' + (data.current <= 0 ? ' empty' : (newPct <= 30 ? ' low' : ''));
+              } else {
+                btn.textContent = '+1';
+              }
+            } catch (err) {
+              btn.textContent = '+1';
+            }
+            btn.disabled = false;
+          });
+        });
+      }
+
+      // Position the panel near the click
+      zoneResourcePanel.classList.remove('hidden');
+      const panelRect = zoneResourcePanel.getBoundingClientRect();
+      let left = screenX + 15;
+      let top = screenY - 20;
+      if (left + panelRect.width > window.innerWidth - 10) left = screenX - panelRect.width - 15;
+      if (top + panelRect.height > window.innerHeight - 10) top = window.innerHeight - panelRect.height - 10;
+      if (top < 10) top = 10;
+      zoneResourcePanel.style.left = left + 'px';
+      zoneResourcePanel.style.top = top + 'px';
+    }
+
+    function hideZoneResourcePanel() {
+      zoneResourcePanel.classList.add('hidden');
+    }
+
+    if (zoneResourceCloseBtn) {
+      zoneResourceCloseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hideZoneResourcePanel();
+      });
+    }
+
+    // Close panel when clicking outside
+    document.addEventListener('click', (e) => {
+      if (zoneResourcePanel && !zoneResourcePanel.contains(e.target) && !canvas.contains(e.target)) {
+        hideZoneResourcePanel();
+      }
+    });
+
     // === 背景音乐 ===
     const bgm = new Audio('assets/musics/36-Village.ogg');
     bgm.loop = true; bgm.volume = 0.3;
@@ -178,7 +347,15 @@
         if (hoveredPlayerId && clientPlayers[hoveredPlayerId]) {
           selectAndFollowPlayer(hoveredPlayerId);
         } else {
-          isCameraFollowing = false;
+          // Check if clicked on a resource zone
+          const clickedZone = findZoneAtWorldCoord(mouseX, mouseY);
+          if (clickedZone && inferRpgCategory(clickedZone.name)) {
+            const rect = canvas.getBoundingClientRect();
+            showZoneResourcePanel(clickedZone, e.clientX, e.clientY);
+          } else {
+            hideZoneResourcePanel();
+            isCameraFollowing = false;
+          }
         }
       } else {
         isCameraFollowing = false;
@@ -278,6 +455,17 @@
         canvas.classList.remove('dragging');
         if (!dragMoved && hoveredPlayerId && clientPlayers[hoveredPlayerId]) {
           selectAndFollowPlayer(hoveredPlayerId);
+        } else if (!dragMoved) {
+          // Check if tapped on a resource zone
+          const tappedZone = findZoneAtWorldCoord(mouseX, mouseY);
+          if (tappedZone && inferRpgCategory(tappedZone.name)) {
+            const rect = canvas.getBoundingClientRect();
+            const sx = mouseScreenX / canvas.width * rect.width + rect.left;
+            const sy = mouseScreenY / canvas.height * rect.height + rect.top;
+            showZoneResourcePanel(tappedZone, sx, sy);
+          } else {
+            hideZoneResourcePanel();
+          }
         } else if (dragMoved) {
           isCameraFollowing = false;
         }
@@ -456,6 +644,10 @@
         updateCamera(dt);
         draw();
         drawMinimap();
+        // Periodically refresh zone resource data from RPG plugin
+        if (Date.now() - zoneResourceLastFetch > ZONE_RESOURCE_FETCH_INTERVAL) {
+          fetchZoneResources();
+        }
       }
       requestAnimationFrame(gameLoop);
     }
@@ -872,11 +1064,18 @@
           const sx2=TILE_SIZE/mapData.tilewidth,sy2=TILE_SIZE/mapData.tileheight;
           const rx=zone.x*sx2,ry=zone.y*sy2,rw=zone.width*sx2,rh=zone.height*sy2;
           if(mouseX>=rx&&mouseX<=rx+rw&&mouseY>=ry&&mouseY<=ry+rh){
+            const isResourceZone = inferRpgCategory(zone.name) !== null;
+            const suffix = isResourceZone ? ' [点击查看]' : '';
             ctx.font='bold 16px "Pixelify Sans",sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
-            const tw=ctx.measureText(zone.name).width+20,th=35,tx=mouseX-15,ty=mouseY-30;
+            const nameText = zone.name + suffix;
+            const tw=ctx.measureText(nameText).width+20,th=35,tx=mouseX-15,ty=mouseY-30;
             ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.beginPath(); ctx.roundRect(tx,ty,tw,th,8); ctx.fill();
-            ctx.strokeStyle='#f39c12'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
-            ctx.fillStyle='#5c4a3d'; ctx.fillText(zone.name,tx+tw/2,ty+th/2);
+            ctx.strokeStyle=isResourceZone?'#e67e22':'#f39c12'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+            ctx.fillStyle='#5c4a3d'; ctx.fillText(zone.name,tx+tw/2,ty+th/2 - (isResourceZone?6:0));
+            if(isResourceZone){
+              ctx.font='11px "Pixelify Sans",sans-serif'; ctx.fillStyle='#e67e22';
+              ctx.fillText('[点击查看]',tx+tw/2,ty+th/2+10);
+            }
           }
         });
       }
