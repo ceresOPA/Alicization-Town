@@ -6,8 +6,8 @@ services:
     region: singapore
     plan: free
     branch: main
-    buildCommand: npm ci
-    startCommand: node server/src/main.js
+    buildCommand: npm install
+    startCommand: npm run start:server
     envVars:
       - key: NODE_VERSION
         value: "22"

@@ -1,6 +1,6 @@
 {
   "name": "alicization-town-cli",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "CLI for exploring and interacting with Alicization Town via HTTP API",
   "main": "src/town.js",
   "bin": {

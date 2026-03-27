@@ -285,7 +285,7 @@ describe('Bridge MCP (smoke)', () => {
     await waitForBridge(bridge);
     const initResponse = await initializeBridge(bridge);
     assert.equal(initResponse.result.serverInfo.name, 'alicization-bridge');
-    assert.equal(initResponse.result.serverInfo.version, '0.5.0');
+    assert.equal(initResponse.result.serverInfo.version, '0.6.0');
 
     const listResponse = await sendMCPRequest(bridge, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
     const tools = listResponse.result.tools;
