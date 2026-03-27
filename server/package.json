@@ -16,5 +16,8 @@
     "express": "^5.2.1",
     "socket.io": "^4.8.3"
   },
+  "optionalDependencies": {
+    "@ceresopa/rpg-advanced": ">=0.4.0"
+  },
   "_note": "rpg-advanced: 高级RPG系统插件，如需使用请联系 ceresOPA"
 }

@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: alicization-town
+    runtime: node
+    repo: https://github.com/ceresOPA/Alicization-Town
+    region: singapore
+    plan: free
+    branch: main
+    buildCommand: npm ci
+    startCommand: node server/src/main.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NPM_TOKEN
+        sync: false                          # Render 会提示你手动填写
+      - key: ALICIZATION_PLUGINS
+        value: "@ceresopa/rpg-advanced"
+      - key: ALICIZATION_RPG_LICENSE
+        sync: false                          # 插件 license key，手动填写
+      - key: ALICIZATION_TOWN_NPC_ENABLED
+        value: "true"
