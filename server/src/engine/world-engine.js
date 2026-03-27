@@ -686,7 +686,7 @@ function interact(playerId, item) {
   const isNPC = !!player.isNPC;
 
   // 构造钩子上下文，供插件精确匹配资源消耗
-  const hookContext = { playerId, playerName: player.name, isNPC };
+  const hookContext = { playerId, playerName: player.name, isNPC, item };
   const result = getInteractionForZone(zone, hookContext);
   player.interactionText = result.action;
   player.interactionIcon = result.icon || '';

@@ -363,7 +363,7 @@ var require_http_client = __commonJS({
       _getDefaultServer = registry.getDefaultServer;
       _resolveServer = registry.resolveServer;
     }
-    function requestJson(baseUrl, method, apiPath, { body, headers } = {}) {
+    function requestJson(baseUrl, method, apiPath, { body, headers, timeout = 6e4 } = {}) {
       return new Promise((resolve, reject) => {
         const url = new URL(apiPath, baseUrl);
         const isHttps = url.protocol === "https:";
@@ -376,7 +376,7 @@ var require_http_client = __commonJS({
             "Content-Type": "application/json",
             ...headers || {}
           },
-          timeout: 1e4
+          timeout
         };
         const req = (isHttps ? https : http).request(options, (res) => {
           let data = "";
@@ -815,6 +815,11 @@ var require_session_handle = __commonJS({
 // shared/town-client/formatters.js
 var require_formatters = __commonJS({
   "shared/town-client/formatters.js"(exports2, module2) {
+    function shortId(id) {
+      if (!id) return "";
+      const s = String(id);
+      return ` #${s.slice(-4)}`;
+    }
     function stringifyResult(value) {
       return JSON.stringify(value, null, 2);
     }
@@ -841,13 +846,15 @@ var require_formatters = __commonJS({
       if (!directory || directory.length === 0) {
         return "\u5C0F\u9547\u76EE\u524D\u6CA1\u6709\u4EFB\u4F55\u6807\u8BB0\u7684\u7279\u6B8A\u533A\u57DF\u3002";
       }
-      let info = "\u{1F4DC} \u3010\u65C5\u6E38\u6307\u5357\u3011\u4EE5\u4E0B\u662F\u5C0F\u9547\u4E2D\u6240\u6709\u91CD\u8981\u5730\u70B9\u53CA\u5176\u4E2D\u5FC3\u5750\u6807\uFF1A\n\n";
+      let info = "\u{1F4DC} \u3010\u65C5\u6E38\u6307\u5357\u3011\u4EE5\u4E0B\u662F\u5C0F\u9547\u4E2D\u53EF\u524D\u5F80\u7684\u5730\u70B9\uFF1A\n\n";
       directory.forEach((place) => {
-        info += `\u{1F539} [${place.name}] -> \u5750\u6807: (${place.x}, ${place.y})
+        info += `\u{1F539} [${place.id}] ${place.name} -> \u5750\u6807: (${place.x}, ${place.y})
    \u8BF4\u660E: ${place.description}
 `;
       });
-      info += "\n\u{1F4A1} \u63D0\u793A: \u4F7F\u7528 walk \u5DE5\u5177\u524D\u5F80\u4F60\u60F3\u53BB\u7684\u5730\u65B9\u3002";
+      const exampleId = directory[0]?.id || "restaurant#20de";
+      info += `
+\u{1F4A1} \u4F7F\u7528 walk --to "${exampleId}" \u524D\u5F80\u76EE\u6807\u5730\u70B9\uFF08\u5FC5\u987B\u4F7F\u7528\u4E0A\u65B9\u5217\u51FA\u7684\u7CBE\u786E id\uFF09\u3002`;
       return info;
     }
     function formatLook(result) {
@@ -869,7 +876,7 @@ var require_formatters = __commonJS({
       }
       info += "\u{1F465} \u3010\u9644\u8FD1\u7684\u4EBA\u3011\n";
       nearby.forEach((person) => {
-        info += `- ${person.name} \u8DDD\u79BB\u4F60 ${person.distance} \u6B65 (\u4F4D\u4E8E ${person.zone})`;
+        info += `- ${person.name}${shortId(person.id)} \u8DDD\u79BB\u4F60 ${person.distance} \u6B65 (\u4F4D\u4E8E ${person.zone})`;
         if (person.relativeDirection) info += `\uFF0C\u5728\u4F60\u7684${person.relativeDirection}`;
         if (person.message) info += `\uFF0C\u4ED6\u6B63\u5728\u8BF4: "${person.message}"`;
         else if (person.lastSpeakAt) info += `\uFF0C\u6700\u8FD1\u8BF4\u8FC7\u8BDD`;
@@ -877,8 +884,20 @@ var require_formatters = __commonJS({
       });
       return info.trimEnd();
     }
-    function formatWalk(direction, steps) {
-      return `\u4F60\u8BD5\u56FE\u5411 ${direction} \u8D70 ${steps} \u6B65\u3002\u8BF7\u7528 look \u786E\u8BA4\u662F\u5426\u5230\u8FBE\uFF0C\u6216\u662F\u5426\u649E\u5899\u3002`;
+    function formatWalk(result) {
+      const { player, pathLength, wasBlocked, targetZone } = result;
+      let info = "";
+      if (wasBlocked) {
+        info += `\u26A0\uFE0F \u76EE\u6807\u786E\u5207\u4F4D\u7F6E\u88AB\u963B\u6321\uFF0C\u5DF2\u5230\u8FBE\u6700\u8FD1\u7684\u53EF\u901A\u884C\u4F4D\u7F6E\u3002
+`;
+      }
+      info += `\u{1F4CD} \u5DF2\u5230\u8FBE (${player.x}, ${player.y})`;
+      if (targetZone) info += ` \u2014 ${targetZone}`;
+      if (player.zone) info += `
+\u{1F4CC} \u5F53\u524D\u533A\u57DF: ${player.zone}`;
+      info += `
+\u{1F6B6} \u8DEF\u5F84\u957F\u5EA6: ${pathLength} \u6B65`;
+      return info;
     }
     function formatChatSend(text) {
       return `\u4F60\u8BF4: ${text}`;
@@ -903,7 +922,7 @@ var require_formatters = __commonJS({
       for (const msg of messages) {
         const t = new Date(msg.time);
         const ts = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
-        info += `[${ts}] ${msg.name}: ${msg.message}
+        info += `[${ts}] ${msg.name}${shortId(msg.playerId)}: ${msg.message}
 `;
       }
       return info.trimEnd();
@@ -921,20 +940,21 @@ var require_formatters = __commonJS({
       for (const event of perceptions) {
         const icon = typeLabels[event.type] || "\u2022";
         const attentionBar = event.attention >= 0.7 ? "\u26A1" : event.attention >= 0.4 ? "\u25CF" : "\u25CB";
+        const tag = shortId(event.fromId);
         if (event.type === "chat") {
-          info += `${attentionBar} ${icon} ${event.from} \u8BF4: "${event.text}" (\u8DDD\u79BB ${event.distance} \u6B65)
+          info += `${attentionBar} ${icon} ${event.from}${tag} \u8BF4: "${event.text}" (\u8DDD\u79BB ${event.distance} \u6B65)
 `;
         } else if (event.type === "interact") {
-          info += `${attentionBar} ${icon} ${event.from} \u5728${event.zone}\u8FDB\u884C\u4E86: ${event.action} (\u8DDD\u79BB ${event.distance} \u6B65)
+          info += `${attentionBar} ${icon} ${event.from}${tag} \u5728${event.zone}\u8FDB\u884C\u4E86: ${event.action} (\u8DDD\u79BB ${event.distance} \u6B65)
 `;
         } else if (event.type === "move") {
-          info += `${attentionBar} ${icon} ${event.from} \u79FB\u52A8\u5230\u4E86${event.zone} (\u8DDD\u79BB ${event.distance} \u6B65)
+          info += `${attentionBar} ${icon} ${event.from}${tag} \u79FB\u52A8\u5230\u4E86${event.zone} (\u8DDD\u79BB ${event.distance} \u6B65)
 `;
         } else if (event.type === "join") {
-          info += `${attentionBar} ${icon} ${event.from} \u52A0\u5165\u4E86\u5C0F\u9547
+          info += `${attentionBar} ${icon} ${event.from}${tag} \u52A0\u5165\u4E86\u5C0F\u9547
 `;
         } else if (event.type === "leave") {
-          info += `${attentionBar} ${icon} ${event.from} \u79BB\u5F00\u4E86\u5C0F\u9547
+          info += `${attentionBar} ${icon} ${event.from}${tag} \u79BB\u5F00\u4E86\u5C0F\u9547
 `;
         }
       }
@@ -1146,15 +1166,19 @@ var require_act = __commonJS({
     }
     async function walk(args2) {
       const flags = parseFlags(args2);
-      const direction = flags.direction || flags._[0];
-      const rawSteps = flags.steps || flags._[1];
-      const steps = Number(rawSteps);
-      if (!direction || !Number.isFinite(steps)) {
-        throw new Error("\u7528\u6CD5: town walk --direction <N|S|W|E> --steps <\u6B65\u6570>");
+      const target = {};
+      if (flags.to || flags._[0]) target.to = flags.to || flags._.join(" ");
+      if (flags.x !== void 0) target.x = Number(flags.x);
+      if (flags.y !== void 0) target.y = Number(flags.y);
+      if (flags.forward !== void 0) target.forward = Number(flags.forward);
+      if (flags.right !== void 0) target.right = Number(flags.right);
+      if (!target.to && target.x === void 0 && target.forward === void 0 && target.right === void 0) {
+        throw new Error("\u7528\u6CD5: town walk --to <\u5730\u540D> | --x <X> --y <Y> | --forward <N> --right <N>");
       }
-      const { auth, result } = await runAuthenticated("POST", "/api/walk", { direction, steps });
+      const { auth, result } = await runAuthenticated("POST", "/api/walk", target);
       if (!result) throwForAuth(auth);
-      console.log(formatWalk(direction, steps));
+      if (result.error) throw new Error(result.error);
+      console.log(formatWalk(result));
     }
     async function chat(args2) {
       const flags = parseFlags(args2);
@@ -1166,12 +1190,56 @@ var require_act = __commonJS({
       if (!result) throwForAuth(auth);
       console.log(formatChatSend(text));
     }
-    async function interact() {
-      const { auth, result } = await runAuthenticated("POST", "/api/interact");
+    async function interact(args2) {
+      const flags = parseFlags(args2);
+      const item = flags.item || flags._.join(" ") || null;
+      const body = item ? { item } : void 0;
+      const { auth, result } = await runAuthenticated("POST", "/api/interact", body);
       if (!result) throwForAuth(auth);
       console.log(formatInteract(result));
     }
-    module2.exports = { walk, chat, interact };
+    async function status() {
+      try {
+        const { auth, result } = await runAuthenticated("GET", "/api/rpg/attrs");
+        if (!result) throwForAuth(auth);
+        if (!result || !result.attrs) {
+          console.log("\u2699\uFE0F status \u547D\u4EE4\u9700\u8981 RPG Advanced \u63D2\u4EF6\u652F\u6301\u3002\u5F53\u524D\u670D\u52A1\u5668\u672A\u5B89\u88C5\u8BE5\u63D2\u4EF6\uFF0C\u8BF7\u8054\u7CFB\u670D\u52A1\u5668\u7BA1\u7406\u5458\u4E86\u89E3\u8BE6\u60C5\u3002");
+          return;
+        }
+        const attrLabels = {
+          hp: "\u2764\uFE0F \u751F\u547D",
+          hunger: "\u{1F35C} \u9971\u8179",
+          mood: "\u{1F60A} \u5FC3\u60C5",
+          energy: "\u26A1 \u7CBE\u529B",
+          social: "\u{1F4AC} \u793E\u4EA4",
+          age: "\u{1F4C5} \u5E74\u9F84"
+        };
+        let text = "\u{1F4CA} \u3010\u6211\u7684\u72B6\u6001\u3011\n";
+        for (const [key, info] of Object.entries(result.attrs)) {
+          const label = attrLabels[key] || key;
+          const max = info.max || 100;
+          const pct = Math.round(info.value / max * 10);
+          const bar = "\u2588".repeat(pct) + "\u2591".repeat(10 - pct);
+          text += `${label}: ${info.value}/${max} ${bar} (${info.label})
+`;
+        }
+        if (result.suggestions && result.suggestions.length > 0) {
+          text += "\n\u{1F4A1} \u3010\u884C\u52A8\u5EFA\u8BAE\u3011\n";
+          for (const s of result.suggestions) {
+            text += `\u2022 ${s}
+`;
+          }
+        }
+        console.log(text.trimEnd());
+      } catch (err) {
+        if (err.statusCode === 404 || err.message?.includes("404")) {
+          console.log("\u2699\uFE0F status \u547D\u4EE4\u9700\u8981 RPG Advanced \u63D2\u4EF6\u652F\u6301\u3002\u5F53\u524D\u670D\u52A1\u5668\u672A\u5B89\u88C5\u8BE5\u63D2\u4EF6\uFF0C\u8BF7\u8054\u7CFB\u670D\u52A1\u5668\u7BA1\u7406\u5458\u4E86\u89E3\u8BE6\u60C5\u3002");
+        } else {
+          throw err;
+        }
+      }
+    }
+    module2.exports = { walk, chat, interact, status };
   }
 });
 
@@ -1345,6 +1413,9 @@ async function main() {
     case "interact":
       await require_act().interact(args);
       break;
+    case "status":
+      await require_act().status();
+      break;
     case "server":
       require_server().server(args);
       break;
@@ -1372,9 +1443,10 @@ async function main() {
   map
 
 \u52A8\u4F5C:
-  walk --direction <N|S|W|E> --steps <STEP>
+  walk --to <id> | --x <X> --y <Y> | --forward <N> --right <N>
   chat --text <MESSAGE>
-  interact
+  interact [--item <\u7269\u54C1\u540D>]       \u4E0E\u5F53\u524D\u533A\u57DF\u4E92\u52A8\uFF08\u53EF\u6307\u5B9A\u7269\u54C1\uFF09
+  status                           \u67E5\u770B\u8EAB\u4F53\u72B6\u6001\uFF08\u9700\u8981 RPG \u63D2\u4EF6\uFF09
 `);
   }
 }

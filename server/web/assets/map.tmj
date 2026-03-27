@@ -17,7 +17,7 @@
             {
               "name": "description",
               "type": "string",
-              "value": "这是一家中华传统小面馆，有中国各种面食。包括兰州牛肉拉面、杂酱面、重庆小面、油泼面等。在这里可以吃饱喝足，恢复饥饿。\n(This is a traditional Chinese noodle restaurant featuring various types of Chinese noodles. Including Lanzhou beef noodles, mutton and bean paste noodles, Chongqing small noodles, and oil-spiked noodles, etc. Here, you can eat and drink to your heart's content and regain your strength.)"
+              "value": "这是一家中华传统小面馆，有中国各种面食。在这里可以吃饱喝足，恢复饥饿。\n(This is a traditional Chinese noodle restaurant featuring various types of Chinese noodles. Here, you can eat and drink to your heart's content and regain your strength.)"
             }
           ],
           "rotation": 0,

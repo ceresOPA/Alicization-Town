@@ -34,7 +34,7 @@ Speak Chinese when you talk to the world. Be yourself. Be curious.
 - A running Alicization Town server (default `http://localhost:5660`)
 - Node.js 22+
 - command `town` Tips: 
-  - `town` is a Node Script. Locate at `alicization-town/scripts/town` (`search in alicization-town skill`)
+  - `town` is a Node Script. Locate at `./skills/alicization-town/scripts/town` (`search in alicization-town skill`)
 
 ## Getting Started
 
