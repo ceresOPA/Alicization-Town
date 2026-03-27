@@ -39,16 +39,6 @@ const playerActivities = {};
 const walkAborts = new Map();
 const events = new EventEmitter();
 
-// ── 插件交互钩子：允许插件覆盖特定区域的交互结果 ─────────────────────────────
-// hookFn({ playerId, playerName, isNPC, zone, category }) => { action, result, icon, sound, item? } | null
-const interactionHooks = [];
-
-function registerInteractionHook(hookFn) {
-  if (typeof hookFn === 'function') {
-    interactionHooks.push(hookFn);
-  }
-}
-
 function deriveHandle(publicKey) {
   return `at_${crypto.createHash('sha256').update(publicKey).digest('hex').slice(0, 24)}`;
 }
@@ -635,34 +625,7 @@ function interact(playerId) {
   if (!player) return null;
   touchAction(playerId);
   const zone = getZoneAt(player.x, player.y);
-  const isNPC = player.isNPC || false;
-
-  // 推断区域类别，供插件钩子使用
-  const normalizedName = (zone?.name || '').toLowerCase();
-  let category = null;
-  for (const [matcher, matchedCategory] of ZONE_CATEGORY_MAP) {
-    if (matcher.test(normalizedName)) {
-      category = matchedCategory;
-      break;
-    }
-  }
-
-  // 尝试插件交互钩子（按注册顺序，第一个非 null 结果生效）
-  let result = null;
-  for (const hook of interactionHooks) {
-    try {
-      result = hook({ playerId, playerName: player.name, isNPC, zone, category });
-      if (result) break;
-    } catch (err) {
-      console.error('[interact-hook] 插件钩子执行出错:', err.message || err);
-    }
-  }
-
-  // 无插件覆盖时，回退到默认随机交互
-  if (!result) {
-    result = getInteractionForZone(zone);
-  }
-
+  const result = getInteractionForZone(zone);
   player.interactionText = result.action;
   player.interactionIcon = result.icon || '';
   player.interactionSound = result.sound || 'interact';
@@ -678,13 +641,10 @@ function interact(playerId) {
   }, INTERACTION_TTL_MS);
   const entry = {
     time: Date.now(),
-    playerId,
     name: player.name,
-    isNPC,
     zone: zone ? zone.name : '小镇街道',
     action: result.action,
     result: result.result,
-    item: result.item || null,
   };
   events.emit('interaction', entry);
   addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });
@@ -761,7 +721,6 @@ module.exports = {
   readMap,
   setThinking,
   touchAction,
-  registerInteractionHook,
   getMapDirectory: () => mapDirectory,
   getCharacterList: () => CHARACTER_SPRITES.slice(),
   getAllPlayers: () => players,

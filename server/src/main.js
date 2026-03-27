@@ -5,7 +5,6 @@ const { Server } = require('socket.io');
 const path = require('path');
 const worldEngine = require('./engine/world-engine');
 const apiRouter = require('./routes');
-const { PluginContext } = require('./plugin-context');
 
 const { NpcManager } = require('./npc/npc-manager');
 
@@ -19,29 +18,6 @@ app.use('/api', apiRouter);
 
 // ── 初始化世界引擎 ───────────────────────────────────────────────────────────
 worldEngine.init(path.join(__dirname, '..', 'web', 'assets', 'map.tmj'));
-app.locals.worldEngine = worldEngine;
-
-// ── 插件加载 ─────────────────────────────────────────────────────────────────
-const loadedPlugins = [];
-
-async function loadPlugins() {
-  const pluginNames = (process.env.ALICIZATION_PLUGINS || '').split(',').map(s => s.trim()).filter(Boolean);
-  for (const pluginName of pluginNames) {
-    try {
-      const PluginClass = require(pluginName);
-      const PluginCtor = PluginClass.default || PluginClass;
-      const plugin = new PluginCtor();
-      const ctx = new PluginContext({ worldEngine, app, apiRouter });
-      await plugin.onRegister(ctx);
-      loadedPlugins.push({ plugin, ctx });
-      console.log(`🔌 插件已加载: ${plugin.id || pluginName} v${plugin.version || '?'}`);
-    } catch (err) {
-      console.error(`❌ 插件 ${pluginName} 加载失败:`, err.message || err);
-    }
-  }
-}
-
-loadPlugins().catch(err => console.error('插件加载异常:', err));
 
 // ── 通过 SSE 向网页观察端推送状态 ───────────────────────────────────────────
 let sseClients = [];
@@ -101,14 +77,8 @@ const npcManager = new NpcManager(worldEngine);
 npcManager.start();
 app.locals.npcManager = npcManager;
 
-// ── 优雅关闭：清理 NPC + 插件 ──────────────────────────────────────────────
-async function gracefulShutdown() {
-  for (const { plugin, ctx } of loadedPlugins) {
-    try {
-      await plugin.onUnregister?.();
-      ctx.cleanup();
-    } catch (_) { /* ignore */ }
-  }
+// ── 优雅关闭：清理 NPC ──────────────────────────────────────────────────────
+function gracefulShutdown() {
   npcManager.stop();
   server.close();
 }
