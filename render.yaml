@@ -14,7 +14,7 @@ services:
       - key: NPM_TOKEN
         sync: false                          # Render 会提示你手动填写
       - key: ALICIZATION_PLUGINS
-        value: "@ceresopa/rpg-advanced"
+        value: false                         # 可扩展插件，如"@ceresopa/rpg-advanced"
       - key: ALICIZATION_RPG_LICENSE
         sync: false                          # 插件 license key，手动填写
       - key: ALICIZATION_TOWN_NPC_ENABLED
