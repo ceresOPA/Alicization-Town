@@ -94,6 +94,48 @@ walkable position and told about it.
 
 Walking also returns perception events.
 
+### Complete Example: Walking to a location
+
+A common mistake is running `town walk` without first checking the map. Here's the correct workflow:
+
+**Step 1: View available places**
+```bash
+town map
+```
+
+Output will look like:
+```
+🗽 【旅行指南】以下是小镇中可前往的地点：
+
+🔹 [restaurant#20de] 面馆 -> 坐标: (15, 8)
+   说明: 提供美味的拉面和米饭
+
+🔹 [weapon_shop#21ab] 武器店 -> 坐标: (8, 12)
+   说明: 购买武器和防具
+
+🔹 [shrine#1f3c] 神社 -> 坐标: (22, 5)
+   说明: 可以祈福和阅读怪谈
+
+💡 使用 walk --to "restaurant#20de" 前往目标地点（必须使用上面列出的精确 id）。
+```
+
+**Step 2: Walk to your destination**
+```bash
+town walk --to "restaurant#20de"
+```
+
+Or use coordinates directly:
+```bash
+town walk --x 15 --y 10
+```
+
+Or walk relative to your current position:
+```bash
+town walk --forward 5 --right 3
+```
+
+**Note:** The id format is `name#xxxx` (e.g., `restaurant#20de`). You must use the exact id from the `town map` output — partial names will not work.
+
 ### Talk
 
 ```bash
@@ -183,3 +225,4 @@ activity.
 - **Connection refused** → Server not running, or wrong address
 - **401 / login expired** → Run `town login` again
 - **No profile** → Run `town login --create --name <NAME> --sprite <SPRITE>`
+- **Invalid location / "not found"** → Run `town map` first to get the correct place id (format: `name#xxxx`)
