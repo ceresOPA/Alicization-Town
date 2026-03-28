@@ -20,12 +20,12 @@ async function handle(name, args, client) {
   }
   const perceptionText = client.formatPerceptions(result.perceptions);
 
-  // 尝试附带 RPG 属性摘要（插件不存在时静默跳过）
+  // 尝试附带 base-stats 属性摘要
   let attrText = '';
   try {
-    const attrResult = await client.getRpgAttrs();
-    if (attrResult && !attrResult.startsWith('⚙️')) {
-      attrText = '\n\n' + attrResult;
+    const { result: statsResult } = await client.getBaseStats();
+    if (statsResult) {
+      attrText = '\n\n' + client.formatBaseStats(statsResult);
     }
   } catch {}
 

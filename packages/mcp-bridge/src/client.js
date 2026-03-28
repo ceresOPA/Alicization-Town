@@ -131,23 +131,92 @@ async function setThinking(isThinking) {
 }
 
 /**
- * 查询 RPG 属性（需要 RPG 插件支持，优雅降级）
- * @returns {string} 格式化后的属性文本
+ * 查询基础属性（base-stats 内置插件）
+ * @returns {{ auth?: Object, result?: Object }} 原始 API 响应
  */
-async function getRpgAttrs() {
-  try {
-    const { auth, result } = await authenticatedRequest('GET', '/api/rpg/attrs');
-    if (!result) {
-      return auth?.message || '当前还没有可用 profile，请先 login。';
-    }
-    return formatRpgAttrs(result);
-  } catch (err) {
-    // 插件未安装时请求会 404
-    if (err.statusCode === 404 || err.message?.includes('404')) {
-      return '⚙️ 属性系统需要 RPG Advanced 插件支持。当前服务器未安装该插件，请联系服务器管理员了解详情。';
-    }
-    return '⚙️ 属性系统暂时不可用，请稍后再试。';
+async function getBaseStats() {
+  return authenticatedRequest('GET', '/api/stats/status');
+}
+
+/**
+ * 查询背包（base-stats 内置插件）
+ * @returns {{ auth?: Object, result?: Object }}
+ */
+async function getInventory() {
+  return authenticatedRequest('GET', '/api/stats/inventory');
+}
+
+/**
+ * 使用消耗品（base-stats 内置插件）
+ * @param {string} itemKey
+ * @returns {{ auth?: Object, result?: Object }}
+ */
+async function useStatsItem(itemKey) {
+  return authenticatedRequest('POST', '/api/stats/use', { itemKey });
+}
+
+/**
+ * 装备物品（base-stats 内置插件）
+ * @param {string} itemKey
+ * @returns {{ auth?: Object, result?: Object }}
+ */
+async function equipStatsItem(itemKey) {
+  return authenticatedRequest('POST', '/api/stats/equip', { itemKey });
+}
+
+/**
+ * 格式化 base-stats 属性为可读文本
+ */
+function formatBaseStats(data) {
+  if (!data) return '';
+  let text = '📊 【我的状态】\n';
+  text += `🏷️ ${data.playerName || '???'}  Lv.${data.level || 1}\n`;
+  text += `❤️ HP: ${data.hp}/${data.maxHp} ${makeBar(data.hp, data.maxHp)}\n`;
+  text += `⚔️ ATK: ${data.atk}  🛡️ DEF: ${data.def}\n`;
+  text += `✨ EXP: ${data.exp}/${data.expNeeded}\n`;
+  text += `💰 Gold: ${data.gold}\n`;
+  if (data.equipment) {
+    const eq = data.equipment;
+    const slots = [];
+    if (eq.weapon) slots.push(`武器: ${eq.weapon.name}`);
+    if (eq.armor) slots.push(`防具: ${eq.armor.name}`);
+    if (eq.accessory) slots.push(`饰品: ${eq.accessory.name}`);
+    if (slots.length > 0) text += `🔧 装备: ${slots.join(' | ')}\n`;
   }
+  text += `🎒 背包: ${data.inventoryCount} 件物品`;
+  return text;
+}
+
+/**
+ * 格式化背包内容为可读文本
+ */
+function formatInventory(data) {
+  if (!data) return '';
+  let text = `💰 Gold: ${data.gold}\n\n`;
+  if (data.equipment) {
+    const eq = data.equipment;
+    text += '🔧 【装备栏】\n';
+    text += `  武器: ${eq.weapon ? eq.weapon.name : '（空）'}\n`;
+    text += `  防具: ${eq.armor ? eq.armor.name : '（空）'}\n`;
+    text += `  饰品: ${eq.accessory ? eq.accessory.name : '（空）'}\n`;
+  }
+  text += '\n🎒 【背包】\n';
+  if (!data.inventory || data.inventory.length === 0) {
+    text += '  （空空如也）';
+  } else {
+    for (const item of data.inventory) {
+      const count = item.count > 1 ? ` x${item.count}` : '';
+      const bonus = [];
+      if (item.atkBonus) bonus.push(`ATK+${item.atkBonus}`);
+      if (item.defBonus) bonus.push(`DEF+${item.defBonus}`);
+      if (item.atk) bonus.push(`ATK+${item.atk}`);
+      if (item.def) bonus.push(`DEF+${item.def}`);
+      if (item.effect === 'heal') bonus.push(`回复${item.value}HP`);
+      const bonusText = bonus.length > 0 ? ` (${bonus.join(', ')})` : '';
+      text += `  ${item.emoji || '•'} [${item.key}] ${item.name}${count}${bonusText}\n`;
+    }
+  }
+  return text.trimEnd();
 }
 
 /**
@@ -190,39 +259,6 @@ async function getGhostStories() {
   }
 }
 
-/**
- * 格式化 RPG 属性数据为可读文本
- */
-function formatRpgAttrs(data) {
-  if (!data || !data.attrs) {
-    return '⚙️ 属性系统需要 RPG Advanced 插件支持。当前服务器未安装该插件，请联系服务器管理员了解详情。';
-  }
-
-  let text = '📊 【我的状态】\n';
-  const attrLabels = {
-    hp: '❤️ 生命',
-    hunger: '🍜 饱腹',
-    mood: '😊 心情',
-    energy: '⚡ 精力',
-    social: '💬 社交',
-    age: '📅 年龄',
-  };
-
-  for (const [key, info] of Object.entries(data.attrs)) {
-    const label = attrLabels[key] || key;
-    const bar = makeBar(info.value, info.max || 100);
-    text += `${label}: ${info.value}/${info.max || 100} ${bar} (${info.label})\n`;
-  }
-
-  if (data.suggestions && data.suggestions.length > 0) {
-    text += '\n💡 【行动建议】\n';
-    for (const s of data.suggestions) {
-      text += `• ${s}\n`;
-    }
-  }
-
-  return text.trimEnd();
-}
 
 function makeBar(value, max) {
   const pct = Math.round((value / max) * 10);
@@ -265,7 +301,12 @@ module.exports = {
   getChat,
   flushContext,
   setThinking,
-  getRpgAttrs,
+  getBaseStats,
+  getInventory,
+  useStatsItem,
+  equipStatsItem,
+  formatBaseStats,
+  formatInventory,
   getZoneResources,
   getAllZoneResources,
   getGhostStories,

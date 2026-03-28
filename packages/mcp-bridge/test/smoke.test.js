@@ -175,6 +175,33 @@ function createMockServer() {
           return;
         }
 
+        // base-stats 内置插件路由
+        if (req.url.startsWith('/api/stats/status') && req.method === 'GET') {
+          res.end(JSON.stringify({
+            playerName: 'BridgeBot', level: 1, exp: 0, expNeeded: 20,
+            hp: 50, maxHp: 50, atk: 8, def: 3, gold: 0, inventoryCount: 0,
+            equipment: { weapon: null, armor: null, accessory: null },
+          }));
+          return;
+        }
+
+        if (req.url.startsWith('/api/stats/inventory') && req.method === 'GET') {
+          res.end(JSON.stringify({
+            inventory: [], equipment: { weapon: null, armor: null, accessory: null }, gold: 0,
+          }));
+          return;
+        }
+
+        if (req.url === '/api/stats/use' && req.method === 'POST') {
+          res.end(JSON.stringify({ success: false, log: '背包中没有该物品' }));
+          return;
+        }
+
+        if (req.url === '/api/stats/equip' && req.method === 'POST') {
+          res.end(JSON.stringify({ success: false, log: '背包中没有该物品' }));
+          return;
+        }
+
         if (req.url === '/api/logout' && req.method === 'POST') {
           if (auth) tokens.delete(auth);
           res.end(JSON.stringify({ ok: true }));

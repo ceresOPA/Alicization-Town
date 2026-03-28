@@ -45,48 +45,63 @@ async function interact(args) {
   console.log(formatInteract(result));
 }
 
-async function status() {
-  try {
-    const { auth, result } = await runAuthenticated('GET', '/api/rpg/attrs');
+async function status(args) {
+  const flags = parseFlags(args || []);
+
+  // 使用物品: status --use <itemKey>
+  if (flags.use) {
+    const { auth, result } = await runAuthenticated('POST', '/api/stats/use', { itemKey: flags.use });
     if (!result) throwForAuth(auth);
-    if (!result || !result.attrs) {
-      console.log('⚙️ status 命令需要 RPG Advanced 插件支持。当前服务器未安装该插件，请联系服务器管理员了解详情。');
-      return;
-    }
+    console.log(result.log || result.error || JSON.stringify(result));
+    return;
+  }
 
-    const attrLabels = {
-      hp: '❤️ 生命',
-      hunger: '🍜 饱腹',
-      mood: '😊 心情',
-      energy: '⚡ 精力',
-      social: '💬 社交',
-      age: '📅 年龄',
-    };
+  // 装备物品: status --equip <itemKey>
+  if (flags.equip) {
+    const { auth, result } = await runAuthenticated('POST', '/api/stats/equip', { itemKey: flags.equip });
+    if (!result) throwForAuth(auth);
+    console.log(result.log || result.error || JSON.stringify(result));
+    return;
+  }
 
-    let text = '📊 【我的状态】\n';
-    for (const [key, info] of Object.entries(result.attrs)) {
-      const label = attrLabels[key] || key;
-      const max = info.max || 100;
-      const pct = Math.round((info.value / max) * 10);
-      const bar = '█'.repeat(pct) + '░'.repeat(10 - pct);
-      text += `${label}: ${info.value}/${max} ${bar} (${info.label})\n`;
-    }
+  // 查看状态（默认）
+  const { auth, result } = await runAuthenticated('GET', '/api/stats/status');
+  if (!result) throwForAuth(auth);
 
-    if (result.suggestions && result.suggestions.length > 0) {
-      text += '\n💡 【行动建议】\n';
-      for (const s of result.suggestions) {
-        text += `• ${s}\n`;
+  const makeBar = (v, m) => {
+    const pct = Math.round((v / m) * 10);
+    return '█'.repeat(pct) + '░'.repeat(10 - pct);
+  };
+
+  let text = '📊 【我的状态】\n';
+  text += `🏷️ ${result.playerName || '???'}  Lv.${result.level || 1}\n`;
+  text += `❤️ HP: ${result.hp}/${result.maxHp} ${makeBar(result.hp, result.maxHp)}\n`;
+  text += `⚔️ ATK: ${result.atk}  🛡️ DEF: ${result.def}\n`;
+  text += `✨ EXP: ${result.exp}/${result.expNeeded}\n`;
+  text += `💰 Gold: ${result.gold}\n`;
+  if (result.equipment) {
+    const eq = result.equipment;
+    const slots = [];
+    if (eq.weapon) slots.push(`武器: ${eq.weapon.name}`);
+    if (eq.armor) slots.push(`防具: ${eq.armor.name}`);
+    if (eq.accessory) slots.push(`饰品: ${eq.accessory.name}`);
+    if (slots.length > 0) text += `🔧 装备: ${slots.join(' | ')}\n`;
+  }
+  text += `🎒 背包: ${result.inventoryCount} 件物品`;
+
+  // 背包详情
+  try {
+    const { result: inv } = await runAuthenticated('GET', '/api/stats/inventory');
+    if (inv && inv.inventory && inv.inventory.length > 0) {
+      text += '\n\n🎒 【背包】\n';
+      for (const item of inv.inventory) {
+        const count = item.count > 1 ? ` x${item.count}` : '';
+        text += `  ${item.emoji || '•'} [${item.key}] ${item.name}${count}\n`;
       }
     }
+  } catch {}
 
-    console.log(text.trimEnd());
-  } catch (err) {
-    if (err.statusCode === 404 || err.message?.includes('404')) {
-      console.log('⚙️ status 命令需要 RPG Advanced 插件支持。当前服务器未安装该插件，请联系服务器管理员了解详情。');
-    } else {
-      throw err;
-    }
-  }
+  console.log(text.trimEnd());
 }
 
 module.exports = { walk, chat, interact, status };

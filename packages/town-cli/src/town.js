@@ -42,7 +42,7 @@ async function main() {
       break;
 
     case 'status':
-      await require('./lib/act').status();
+      await require('./lib/act').status(args);
       break;
 
     case 'server':
@@ -77,7 +77,9 @@ async function main() {
   walk --to <id> | --x <X> --y <Y> | --forward <N> --right <N>
   chat --text <MESSAGE>
   interact [--item <物品名>]       与当前区域互动（可指定物品）
-  status                           查看身体状态（需要 RPG 插件）
+  status                           查看角色属性、背包、装备
+  status --use <物品key>           使用消耗品
+  status --equip <物品key>         装备武器/防具
 `);
   }
 }
