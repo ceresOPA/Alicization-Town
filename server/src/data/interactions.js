@@ -61,7 +61,7 @@ const ZONE_INTERACTIONS = {
       { action: '望向远方的海面', result: '夕阳映照在海面上，金光粼粼。远处隐约可见一座小岛的轮廓。', icon: 'WaterPot', sound: 'heal' },
     ],
     watchtower: [
-      { action: '登上塔顶瞭望', result: '从塔顶看到整个小镇：北边仓库、南边农场、东边花园...一切尽收眼底。', icon: 'Bow', sound: 'interact' },
+      { action: '登上塔顶瞭望', result: '从塔顶看到整个小镇：北边仓库、南边图书馆、冒险者工会、东边茂密森林...一切尽收眼底。', icon: 'Bow', sound: 'interact' },
       { action: '和守卫交谈', result: '守卫说："最近东方森林有异常动静，可能有魔物出没。大家要小心。"', icon: 'Sword', sound: 'chat' },
       { action: '使用望远镜', result: '透过古老的望远镜，你看到远方山脉中有一座隐藏的城堡。', icon: 'GoldKey', sound: 'interact' },
     ],
