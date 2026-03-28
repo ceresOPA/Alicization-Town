@@ -39,7 +39,7 @@
     let mouseX = -1, mouseY = -1;
 
     // === 镜头状态 ===
-    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 1.0, targetZoom: 1.0 };
+    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 0.5, targetZoom: 0.5 };
     let isCameraFollowing = false;
     function getMinZoom() {
       if (!mapData) return 0.5;
@@ -325,7 +325,7 @@
     });
 
     // === Zoom button controls ===
-    const DEFAULT_ZOOM = 1.0;
+    const DEFAULT_ZOOM = 0.5;
 
     function applyZoom(newZoom) {
       camera.targetZoom = Math.max(getMinZoom(), Math.min(4.0, newZoom));
@@ -394,10 +394,17 @@
         }
         // 观察端固定视口尺寸，避免布局变化打乱像素比例。
         canvas.width = VIEWPORT_W; canvas.height = VIEWPORT_H;
-        // 初始镜头居中，首屏不会贴在地图边缘。
         const mapPixelW = mapData.width * TILE_SIZE, mapPixelH = mapData.height * TILE_SIZE;
-        camera.x = camera.targetX = mapPixelW / 2 - VIEWPORT_W / (2 * camera.zoom);
-        camera.y = camera.targetY = mapPixelH / 2 - VIEWPORT_H / (2 * camera.zoom);
+
+        // 动态调整小地图画布尺寸，使其完全匹配地图宽高比，消除留白。
+        const miniMapW = miniCanvas.width;
+        const miniMapH = Math.round(miniMapW * (mapPixelH / mapPixelW));
+        miniCanvas.width = miniMapW;
+        miniCanvas.height = miniMapH;
+
+        // 默认镜头定位到右下角视角。
+        camera.x = camera.targetX = Math.max(0, mapPixelW - VIEWPORT_W / camera.zoom);
+        camera.y = camera.targetY = Math.max(0, mapPixelH - VIEWPORT_H / camera.zoom);
 
         const eventSource = new EventSource('/events');
         eventSource.onopen = () => { document.getElementById('status-text').innerText = "Connected - Let your OpenClaw or ClaudeCode Join the World!"; };
