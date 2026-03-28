@@ -1198,46 +1198,60 @@ var require_act = __commonJS({
       if (!result) throwForAuth(auth);
       console.log(formatInteract(result));
     }
-    async function status() {
-      try {
-        const { auth, result } = await runAuthenticated("GET", "/api/rpg/attrs");
-        if (!result) throwForAuth(auth);
-        if (!result || !result.attrs) {
-          console.log("\u2699\uFE0F status \u547D\u4EE4\u9700\u8981 RPG Advanced \u63D2\u4EF6\u652F\u6301\u3002\u5F53\u524D\u670D\u52A1\u5668\u672A\u5B89\u88C5\u8BE5\u63D2\u4EF6\uFF0C\u8BF7\u8054\u7CFB\u670D\u52A1\u5668\u7BA1\u7406\u5458\u4E86\u89E3\u8BE6\u60C5\u3002");
-          return;
-        }
-        const attrLabels = {
-          hp: "\u2764\uFE0F \u751F\u547D",
-          hunger: "\u{1F35C} \u9971\u8179",
-          mood: "\u{1F60A} \u5FC3\u60C5",
-          energy: "\u26A1 \u7CBE\u529B",
-          social: "\u{1F4AC} \u793E\u4EA4",
-          age: "\u{1F4C5} \u5E74\u9F84"
-        };
-        let text = "\u{1F4CA} \u3010\u6211\u7684\u72B6\u6001\u3011\n";
-        for (const [key, info] of Object.entries(result.attrs)) {
-          const label = attrLabels[key] || key;
-          const max = info.max || 100;
-          const pct = Math.round(info.value / max * 10);
-          const bar = "\u2588".repeat(pct) + "\u2591".repeat(10 - pct);
-          text += `${label}: ${info.value}/${max} ${bar} (${info.label})
+    async function status(args2) {
+      const flags = parseFlags(args2 || []);
+      if (flags.use) {
+        const { auth: auth2, result: result2 } = await runAuthenticated("POST", "/api/stats/use", { itemKey: flags.use });
+        if (!result2) throwForAuth(auth2);
+        console.log(result2.log || result2.error || JSON.stringify(result2));
+        return;
+      }
+      if (flags.equip) {
+        const { auth: auth2, result: result2 } = await runAuthenticated("POST", "/api/stats/equip", { itemKey: flags.equip });
+        if (!result2) throwForAuth(auth2);
+        console.log(result2.log || result2.error || JSON.stringify(result2));
+        return;
+      }
+      const { auth, result } = await runAuthenticated("GET", "/api/stats/status");
+      if (!result) throwForAuth(auth);
+      const makeBar = (v, m) => {
+        const pct = Math.round(v / m * 10);
+        return "\u2588".repeat(pct) + "\u2591".repeat(10 - pct);
+      };
+      let text = "\u{1F4CA} \u3010\u6211\u7684\u72B6\u6001\u3011\n";
+      text += `\u{1F3F7}\uFE0F ${result.playerName || "???"}  Lv.${result.level || 1}
 `;
-        }
-        if (result.suggestions && result.suggestions.length > 0) {
-          text += "\n\u{1F4A1} \u3010\u884C\u52A8\u5EFA\u8BAE\u3011\n";
-          for (const s of result.suggestions) {
-            text += `\u2022 ${s}
+      text += `\u2764\uFE0F HP: ${result.hp}/${result.maxHp} ${makeBar(result.hp, result.maxHp)}
+`;
+      text += `\u2694\uFE0F ATK: ${result.atk}  \u{1F6E1}\uFE0F DEF: ${result.def}
+`;
+      text += `\u2728 EXP: ${result.exp}/${result.expNeeded}
+`;
+      text += `\u{1F4B0} Gold: ${result.gold}
+`;
+      if (result.equipment) {
+        const eq = result.equipment;
+        const slots = [];
+        if (eq.weapon) slots.push(`\u6B66\u5668: ${eq.weapon.name}`);
+        if (eq.armor) slots.push(`\u9632\u5177: ${eq.armor.name}`);
+        if (eq.accessory) slots.push(`\u9970\u54C1: ${eq.accessory.name}`);
+        if (slots.length > 0) text += `\u{1F527} \u88C5\u5907: ${slots.join(" | ")}
+`;
+      }
+      text += `\u{1F392} \u80CC\u5305: ${result.inventoryCount} \u4EF6\u7269\u54C1`;
+      try {
+        const { result: inv } = await runAuthenticated("GET", "/api/stats/inventory");
+        if (inv && inv.inventory && inv.inventory.length > 0) {
+          text += "\n\n\u{1F392} \u3010\u80CC\u5305\u3011\n";
+          for (const item of inv.inventory) {
+            const count = item.count > 1 ? ` x${item.count}` : "";
+            text += `  ${item.emoji || "\u2022"} [${item.key}] ${item.name}${count}
 `;
           }
         }
-        console.log(text.trimEnd());
-      } catch (err) {
-        if (err.statusCode === 404 || err.message?.includes("404")) {
-          console.log("\u2699\uFE0F status \u547D\u4EE4\u9700\u8981 RPG Advanced \u63D2\u4EF6\u652F\u6301\u3002\u5F53\u524D\u670D\u52A1\u5668\u672A\u5B89\u88C5\u8BE5\u63D2\u4EF6\uFF0C\u8BF7\u8054\u7CFB\u670D\u52A1\u5668\u7BA1\u7406\u5458\u4E86\u89E3\u8BE6\u60C5\u3002");
-        } else {
-          throw err;
-        }
+      } catch {
       }
+      console.log(text.trimEnd());
     }
     module2.exports = { walk, chat, interact, status };
   }
@@ -1414,7 +1428,7 @@ async function main() {
       await require_act().interact(args);
       break;
     case "status":
-      await require_act().status();
+      await require_act().status(args);
       break;
     case "server":
       require_server().server(args);
@@ -1446,7 +1460,9 @@ async function main() {
   walk --to <id> | --x <X> --y <Y> | --forward <N> --right <N>
   chat --text <MESSAGE>
   interact [--item <\u7269\u54C1\u540D>]       \u4E0E\u5F53\u524D\u533A\u57DF\u4E92\u52A8\uFF08\u53EF\u6307\u5B9A\u7269\u54C1\uFF09
-  status                           \u67E5\u770B\u8EAB\u4F53\u72B6\u6001\uFF08\u9700\u8981 RPG \u63D2\u4EF6\uFF09
+  status                           \u67E5\u770B\u89D2\u8272\u5C5E\u6027\u3001\u80CC\u5305\u3001\u88C5\u5907
+  status --use <\u7269\u54C1key>           \u4F7F\u7528\u6D88\u8017\u54C1
+  status --equip <\u7269\u54C1key>         \u88C5\u5907\u6B66\u5668/\u9632\u5177
 `);
   }
 }

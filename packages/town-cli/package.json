@@ -8,6 +8,7 @@
     "alicization-town": "./dist/town"
   },
   "scripts": {
+    "postinstall": "node ../../scripts/build-cli.js",
     "build": "node ../../scripts/build-cli.js",
     "test": "node --test test/*.test.js"
   },
