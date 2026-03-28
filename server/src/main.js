@@ -10,6 +10,7 @@ const { NpcManager } = require('./npc/npc-manager');
 const { PluginManager } = require('./engine/plugin-manager');
 const BaseInteractionsPlugin = require('./plugins/base-interactions');
 const BaseNpcPlugin = require('./plugins/base-npc');
+const BaseStatsPlugin = require('./plugins/base-stats');
 
 const app = express();
 const server = http.createServer(app);
@@ -38,6 +39,7 @@ pluginManager.setActivityEmitter((data) => {
 
 (async () => {
   // 加载内置基础插件
+  await pluginManager.loadPlugin(new BaseStatsPlugin());
   await pluginManager.loadPlugin(new BaseInteractionsPlugin());
   await pluginManager.loadPlugin(new BaseNpcPlugin());
 

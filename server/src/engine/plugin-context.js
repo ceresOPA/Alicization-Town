@@ -11,12 +11,125 @@ class PluginContext extends IPluginContext {
   /**
    * @param {string} pluginId - 所属插件 ID
    * @param {Object} hooks    - PluginManager 的共享 hooks 注册表
+   * @param {import('./stats-manager').StatsManager} [statsManager] - 共享属性管理器
    */
-  constructor(pluginId, hooks) {
+  constructor(pluginId, hooks, statsManager) {
     super();
     this._pluginId = pluginId;
     this._hooks = hooks;
+    this._statsManager = statsManager || null;
     this._eventCleanups = [];
+  }
+
+  // ── 玩家属性系统接口 ─────────────────────────────────────────────────────
+
+  /**
+   * 获取玩家属性（不存在则自动创建）。
+   * @param {string} playerId
+   * @param {string} [playerName]
+   * @returns {Object} stats 只读副本
+   */
+  getPlayerStats(playerId, playerName) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.getOrCreate(playerId, playerName);
+  }
+
+  /**
+   * 获取玩家属性的只读副本。
+   * @param {string} playerId
+   * @returns {Object|null}
+   */
+  getPlayerStatsSnapshot(playerId) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.get(playerId);
+  }
+
+  /**
+   * 修改玩家属性（增量方式），如 { hp: -10, exp: +20 }。
+   * @param {string} playerId
+   * @param {Object} delta
+   * @returns {Object} 修改后的 stats
+   */
+  modifyPlayerStats(playerId, delta) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.modify(playerId, delta);
+  }
+
+  /**
+   * 直接设置玩家属性值。
+   * @param {string} playerId
+   * @param {Object} values
+   * @returns {Object}
+   */
+  setPlayerStats(playerId, values) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.set(playerId, values);
+  }
+
+  /**
+   * 添加物品到玩家背包。
+   * @param {string} playerId
+   * @param {Object} item - { key, name, type, ... }
+   * @returns {{ success: boolean, log: string }}
+   */
+  addItem(playerId, item) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.addItem(playerId, item);
+  }
+
+  /**
+   * 从玩家背包移除物品。
+   * @param {string} playerId
+   * @param {string} itemKey
+   * @param {number} [count=1]
+   * @returns {{ success: boolean, item?: Object, log: string }}
+   */
+  removeItem(playerId, itemKey, count) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.removeItem(playerId, itemKey, count);
+  }
+
+  /**
+   * 使用消耗品。
+   * @param {string} playerId
+   * @param {string} itemKey
+   * @returns {{ success: boolean, log: string, effect?: string }}
+   */
+  useItem(playerId, itemKey) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.useItem(playerId, itemKey);
+  }
+
+  /**
+   * 装备物品。
+   * @param {string} playerId
+   * @param {string} itemKey
+   * @returns {{ success: boolean, log: string }}
+   */
+  equipItem(playerId, itemKey) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.equip(playerId, itemKey);
+  }
+
+  /**
+   * 添加金币。
+   * @param {string} playerId
+   * @param {number} amount
+   * @returns {{ success: boolean, log: string }}
+   */
+  addGold(playerId, amount) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.addGold(playerId, amount);
+  }
+
+  /**
+   * 检查升级。
+   * @param {string} playerId
+   * @returns {string[]} 升级日志
+   */
+  checkLevelUp(playerId) {
+    if (!this._statsManager) throw new Error(`[${this._pluginId}] StatsManager 未初始化`);
+    return this._statsManager.checkLevelUp(playerId);
   }
 
   registerInteractions(zoneCategory, interactions) {

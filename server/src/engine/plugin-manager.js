@@ -13,11 +13,15 @@
  */
 
 const { PluginContext } = require('./plugin-context');
+const { StatsManager } = require('./stats-manager');
 
 class PluginManager {
   constructor() {
     /** @type {Map<string, { plugin: IPlugin, ctx: PluginContext }>} */
     this._plugins = new Map();
+
+    /** 共享玩家属性管理器 */
+    this._statsManager = new StatsManager();
 
     /** 共享 hooks 注册表 — 所有 PluginContext 写入此处 */
     this._hooks = {
@@ -52,7 +56,7 @@ class PluginManager {
       throw new Error(`Plugin "${plugin.id}" is already loaded`);
     }
 
-    const ctx = new PluginContext(plugin.id, this._hooks);
+    const ctx = new PluginContext(plugin.id, this._hooks, this._statsManager);
     await plugin.onRegister(ctx);
     this._plugins.set(plugin.id, { plugin, ctx });
 
@@ -199,6 +203,14 @@ class PluginManager {
         console.error(`🔌 插件事件处理异常 (${eventType}):`, err.message);
       }
     }
+  }
+
+  /**
+   * 获取共享玩家属性管理器。
+   * @returns {StatsManager}
+   */
+  getStatsManager() {
+    return this._statsManager;
   }
 
   /**
