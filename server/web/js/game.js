@@ -39,7 +39,7 @@
     let mouseX = -1, mouseY = -1;
 
     // === 镜头状态 ===
-    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 0.5, targetZoom: 0.5 };
+    let camera = { x: 0, y: 0, targetX: 0, targetY: 0, zoom: 1.0, targetZoom: 1.0 };
     let isCameraFollowing = false;
     function getMinZoom() {
       if (!mapData) return 0.5;
@@ -325,7 +325,8 @@
     });
 
     // === Zoom button controls ===
-    const DEFAULT_ZOOM = 0.5;
+    // DEFAULT_ZOOM 在地图加载后用 getMinZoom() 赋值，确保缩放重置不会出现空白。
+    let DEFAULT_ZOOM = 1.0;
 
     function applyZoom(newZoom) {
       camera.targetZoom = Math.max(getMinZoom(), Math.min(4.0, newZoom));
@@ -401,6 +402,11 @@
         const miniMapH = Math.round(miniMapW * (mapPixelH / mapPixelW));
         miniCanvas.width = miniMapW;
         miniCanvas.height = miniMapH;
+
+        // 初始缩放设为刚好能看到最大范围且无空白的最小值。
+        const initZoom = getMinZoom();
+        camera.zoom = camera.targetZoom = initZoom;
+        DEFAULT_ZOOM = initZoom;
 
         // 默认镜头定位到右下角视角。
         camera.x = camera.targetX = Math.max(0, mapPixelW - VIEWPORT_W / camera.zoom);
