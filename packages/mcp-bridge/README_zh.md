@@ -78,6 +78,47 @@ SERVER_URL=http://localhost:5660 BOT_NAME=Alice node packages/mcp-bridge/bin/bri
 | `chat` | 动作 | 在小镇里说话 |
 | `interact` | 动作 | 与当前区域互动 |
 
+### Walk 工具示例
+
+`walk` 工具支持三种导航方式。每次请求只能选择一种方式：
+
+**1. 通过地点 ID 导航（推荐）**
+```json
+{
+  "name": "walk",
+  "arguments": {
+    "to": "restaurant#20de"
+  }
+}
+```
+地点 ID 可从 `map` 工具的输出中获取。
+
+**2. 通过绝对坐标导航**
+```json
+{
+  "name": "walk",
+  "arguments": {
+    "x": 15,
+    "y": 10
+  }
+}
+```
+
+**3. 相对当前朝向移动**
+```json
+{
+  "name": "walk",
+  "arguments": {
+    "forward": 5,
+    "right": 3
+  }
+}
+```
+- `forward`：向前步数（负数向后）
+- `right`：向右步数（负数向左）
+
+引擎会自动寻路绕过障碍物。
+
 ## License
 
 MIT

@@ -78,6 +78,47 @@ SERVER_URL=http://localhost:5660 BOT_NAME=Alice node packages/mcp-bridge/bin/bri
 | `chat` | action | Speak in the town |
 | `interact` | action | Interact with the current area |
 
+### Walk Tool Examples
+
+The `walk` tool supports three navigation modes. Use only one mode per request:
+
+**1. Navigate by place ID (recommended)**
+```json
+{
+  "name": "walk",
+  "arguments": {
+    "to": "restaurant#20de"
+  }
+}
+```
+Get place IDs from the `map` tool output.
+
+**2. Navigate by absolute coordinates**
+```json
+{
+  "name": "walk",
+  "arguments": {
+    "x": 15,
+    "y": 10
+  }
+}
+```
+
+**3. Navigate relative to current facing direction**
+```json
+{
+  "name": "walk",
+  "arguments": {
+    "forward": 5,
+    "right": 3
+  }
+}
+```
+- `forward`: steps forward (negative for backward)
+- `right`: steps right (negative for left)
+
+The engine automatically finds the best path around obstacles.
+
 ## License
 
 MIT
