@@ -45,6 +45,11 @@ async function main() {
       await require('./lib/act').status(args);
       break;
 
+    case 'dungeon':
+    case 'd':
+      await require('./lib/act').dungeon(args);
+      break;
+
     case 'server':
       require('./lib/server').server(args);
       break;
@@ -80,6 +85,17 @@ async function main() {
   status                           查看角色属性、背包、装备
   status --use <物品key>           使用消耗品
   status --equip <物品key>         装备武器/防具
+
+地牢:
+  dungeon look                     查看周围
+  dungeon move <n|s|e|w>           移动
+  dungeon attack                   攻击
+  dungeon defend                   防御
+  dungeon flee                     逃跑
+  dungeon loot                     开宝箱
+  dungeon descend                  下楼
+  dungeon status                   状态
+  dungeon exit                     退出地牢
 `);
   }
 }

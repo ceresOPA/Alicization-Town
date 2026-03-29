@@ -141,6 +141,20 @@ function getInteractionForZone(zone, hookContext) {
   if (!zone) return { action: '环顾四周', result: '这里是空旷的街道，没有什么特别的。' };
   const normalizedName = (zone.name || '').toLowerCase();
 
+  // ── 检测地牢区域：需要 dungeon 插件 ───────────────────────────────────
+  const isDungeonZone = /dungeon|地牢|迷宫|labyrinth/i.test(normalizedName);
+  if (isDungeonZone) {
+    const hasDungeonPlugin = pluginManager && pluginManager.hasPlugin && pluginManager.hasPlugin('@ceresopa/dungeon');
+    if (!hasDungeonPlugin) {
+      return {
+        action: '尝试进入地牢',
+        result: '⚠️ 地牢入口被一股神秘力量封锁。\n\n需要安装 alicization-dungeon 插件才能探索地牢。\n请联系作者ceresOPA',
+        icon: 'Lock',
+        sound: 'interact',
+      };
+    }
+  }
+
   // ── 插件路径：优先从 pluginManager 获取交互 ───────────────────────────
   if (pluginManager && pluginManager.hasPlugins()) {
     const category = _resolveCategory(normalizedName);

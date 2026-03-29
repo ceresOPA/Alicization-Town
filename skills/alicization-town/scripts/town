@@ -573,7 +573,8 @@ var require_auth_client = __commonJS({
         token: response.token,
         expiresAt: response.expires_at || new Date(Date.now() + TOKEN_TTL_MS).toISOString(),
         leaseExpiresAt: response.lease_expires_at || null,
-        lastUsedAt: (/* @__PURE__ */ new Date()).toISOString()
+        lastUsedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        playerId: response.playerId || profile.playerId || null
       };
       saveProfile(nextProfile, targetServerFp);
       setDefaultProfileName(nextProfile.profile, targetServerFp);
@@ -587,7 +588,8 @@ var require_auth_client = __commonJS({
         server: nextProfile.server,
         lease_expires_at: nextProfile.leaseExpiresAt,
         message: response.message,
-        token: nextProfile.token
+        token: nextProfile.token,
+        playerId: nextProfile.playerId
       };
     }
     module2.exports = {
@@ -1253,7 +1255,83 @@ var require_act = __commonJS({
       }
       console.log(text.trimEnd());
     }
-    module2.exports = { walk, chat, interact, status };
+    async function dungeon(args2) {
+      const flags = parseFlags(args2);
+      const cmd = flags._[0];
+      if (!cmd || cmd === "look") {
+        const { auth, result } = await runAuthenticated("GET", "/api/dungeon/look");
+        if (!result) throwForAuth(auth);
+        if (result.error) console.log(result.error);
+        else console.log(result.view || result.status || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "move" || cmd === "m") {
+        const dir = flags._[1] || flags.dir;
+        if (!dir) throw new Error("\u7528\u6CD5: town dungeon move <n|s|e|w|ne|nw|se|sw>");
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/move", { direction: dir });
+        if (!result) throwForAuth(auth);
+        if (result.error) console.log(result.error);
+        else {
+          if (result.view) console.log(result.view);
+          if (result.msg) console.log(result.msg);
+        }
+        return;
+      }
+      if (cmd === "attack" || cmd === "a") {
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/attack");
+        if (!result) throwForAuth(auth);
+        console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "defend") {
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/defend");
+        if (!result) throwForAuth(auth);
+        console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "flee") {
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/flee");
+        if (!result) throwForAuth(auth);
+        console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "loot") {
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/loot");
+        if (!result) throwForAuth(auth);
+        console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "descend") {
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/descend");
+        if (!result) throwForAuth(auth);
+        console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "status") {
+        const { auth, result } = await runAuthenticated("GET", "/api/dungeon/status");
+        if (!result) throwForAuth(auth);
+        console.log(result.status || result.error || JSON.stringify(result, null, 2));
+        return;
+      }
+      if (cmd === "exit") {
+        const { auth, result } = await runAuthenticated("POST", "/api/dungeon/exit");
+        if (!result) throwForAuth(auth);
+        console.log(result.msg || result.error || JSON.stringify(result));
+        return;
+      }
+      console.log(`\u7528\u6CD5: town dungeon <command>
+\u547D\u4EE4:
+  look      \u67E5\u770B\u5468\u56F4
+  move <n|s|e|w|ne|nw|se|sw>  \u79FB\u52A8
+  attack    \u653B\u51FB
+  defend    \u9632\u5FA1
+  flee      \u9003\u8DD1
+  loot      \u5F00\u5B9D\u7BB1
+  descend   \u4E0B\u697C
+  status    \u72B6\u6001
+  exit      \u9000\u51FA\u5730\u7262`);
+    }
+    module2.exports = { walk, chat, interact, status, dungeon };
   }
 });
 
@@ -1430,6 +1508,10 @@ async function main() {
     case "status":
       await require_act().status(args);
       break;
+    case "dungeon":
+    case "d":
+      await require_act().dungeon(args);
+      break;
     case "server":
       require_server().server(args);
       break;
@@ -1463,6 +1545,17 @@ async function main() {
   status                           \u67E5\u770B\u89D2\u8272\u5C5E\u6027\u3001\u80CC\u5305\u3001\u88C5\u5907
   status --use <\u7269\u54C1key>           \u4F7F\u7528\u6D88\u8017\u54C1
   status --equip <\u7269\u54C1key>         \u88C5\u5907\u6B66\u5668/\u9632\u5177
+
+\u5730\u7262:
+  dungeon look                     \u67E5\u770B\u5468\u56F4
+  dungeon move <n|s|e|w>           \u79FB\u52A8
+  dungeon attack                   \u653B\u51FB
+  dungeon defend                   \u9632\u5FA1
+  dungeon flee                     \u9003\u8DD1
+  dungeon loot                     \u5F00\u5B9D\u7BB1
+  dungeon descend                  \u4E0B\u697C
+  dungeon status                   \u72B6\u6001
+  dungeon exit                     \u9000\u51FA\u5730\u7262
 `);
   }
 }

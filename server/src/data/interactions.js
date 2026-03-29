@@ -76,6 +76,27 @@ const ZONE_INTERACTIONS = {
       { action: '品尝街头小吃', result: '烤红薯、糖葫芦、热腾腾的包子...集市上的美食让人目不暇接。', icon: 'Onigiri', sound: 'interact' },
       { action: '听街头艺人演奏', result: '流浪乐师弹奏竖琴，悠扬的旋律吸引了不少路人驻足聆听。', icon: 'Heart', sound: 'heal' },
     ],
+    library: [
+      { action: '浏览书架', result: '书架上摆满了各种书籍：魔法理论、历史传记、冒险指南...你随手翻阅了一本关于小镇历史的古籍。', icon: 'GoldKey', sound: 'interact' },
+      { action: '在阅读区看书', result: '你找了个安静的角落坐下，翻开一本冒险者手记，里面记载着许多实用的探险技巧。', icon: 'Heart', sound: 'heal' },
+      { action: '在写作区记录', result: '你拿起羽毛笔，在羊皮纸上记录下自己的冒险经历。墨水在纸上流淌，思绪也变得清晰。', icon: 'FortuneCookie', sound: 'interact' },
+      { action: '向图书管理员咨询', result: '管理员推了推眼镜说："地牢深处据说藏着上古宝藏，但也很危险。组队前往会更安全。"', icon: 'GoldKey', sound: 'chat' },
+    ],
+    guild: [
+      { action: '查看任务布告栏', result: '布告栏上贴满了各种委托：讨伐魔物、收集素材、护送商队...每个任务都有相应的奖励。', icon: 'GoldCoin', sound: 'interact' },
+      { action: '和冒险者交谈', result: '一位资深冒险者分享经验："地牢和迷宫是最近发现的新区域，里面危机四伏但也机遇无限。"', icon: 'FortuneCookie', sound: 'chat' },
+      { action: '在休息区小憩', result: '工会大厅的壁炉很温暖，你在长椅上休息了一会儿，恢复了一些体力。', icon: 'Heart', sound: 'heal' },
+      { action: '阅读工会公告板', result: '公告板上写着最新的冒险者须知：新发现的地下迷宫已开放探索，请量力而行。', icon: 'GoldKey', sound: 'interact' },
+    ],
+    dungeon: [
+      { action: '探索地牢入口', result: '阴冷的石阶向下延伸，墙壁上的火把摇曳不定。远处传来奇怪的回声...你决定先观察一下。', icon: 'Sword', sound: 'interact' },
+      { action: '检查墙壁上的痕迹', result: '石墙上刻满了古老的符文，似乎是一种封印咒语。有人在这里战斗过，留下了剑痕。', icon: 'GoldKey', sound: 'interact' },
+      { action: '倾听地牢深处的声音', result: '从深处传来滴水声和若有若无的低语...这里似乎隐藏着不为人知的秘密。', icon: 'Heart', sound: 'interact' },
+      { action: '做好战斗准备', result: '你握紧武器，调整呼吸。地牢的危险与机遇并存，每一步都要小心谨慎。', icon: 'Sword', sound: 'interact' },
+    ],
+    dungeon_entrance: [
+      { action: '进入地牢', result: '地牢入口就在眼前...（需要 alicization-dungeon 插件）', icon: 'Sword', sound: 'interact' },
+    ],
   },
   nature: {
     tree: [
@@ -119,6 +140,9 @@ const ZONE_CATEGORY_MAP = [
   [/pond|池塘/, 'pond'], [/grass|草/, 'grassland'],
   [/paved|石板/, 'paved'],
   [/billboard|告示牌/, 'billboard'],
+  [/library|图书馆|阅读|写作/, 'library'],
+  [/guild|工会|冒险者/, 'guild'],
+  [/dungeon|地牢|迷宫|labyrinth/i, 'dungeon_entrance'],
 ];
 
 module.exports = { ZONE_INTERACTIONS, ZONE_CATEGORY_MAP };

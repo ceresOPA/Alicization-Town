@@ -41,6 +41,10 @@ class PluginManager {
       middleware: [],
       /** [{ pluginId, matcher: RegExp, category: string }] */
       zoneMatchers: [],
+      /** 活动推送回调 */
+      activityEmitter: null,
+      /** 活跃时间更新回调 */
+      touchActionEmitter: null,
     };
   }
 
@@ -222,11 +226,28 @@ class PluginManager {
   }
 
   /**
+   * 检查指定插件是否已加载。
+   * @param {string} pluginId
+   * @returns {boolean}
+   */
+  hasPlugin(pluginId) {
+    return this._plugins.has(pluginId);
+  }
+
+  /**
    * 设置活动推送回调。插件调用 ctx.emitActivity() 时会触发此回调。
    * @param {Function} emitter - 接收活动数据的函数
    */
   setActivityEmitter(emitter) {
     this._hooks.activityEmitter = emitter;
+  }
+
+  /**
+   * 设置活跃时间更新回调。插件调用 ctx.touchAction() 时会触发此回调。
+   * @param {Function} emitter - 接收 playerId 的函数
+   */
+  setTouchActionEmitter(emitter) {
+    this._hooks.touchActionEmitter = emitter;
   }
 
   /**

@@ -489,8 +489,12 @@
         updateNpcAnimals(dt);
         updatePhysics();
         updateCamera(dt);
-        draw();
-        drawMinimap();
+        if (dungeonSceneMode) {
+          drawDungeonScene();
+        } else {
+          draw();
+          drawMinimap();
+        }
       }
       requestAnimationFrame(gameLoop);
     }
@@ -938,6 +942,19 @@
             ctx.fillStyle='#5c4a3d'; ctx.fillText(msg,cx2,by+bh/2);
           }
 
+          // 地牢冒险状态冒泡
+          const dungeonPlayer = dungeonPlayers.find(dp => dp.id === p.id || dp.name === p.name);
+          if (dungeonPlayer && !p.isThinking && !p.interactionText && !p.message) {
+            const dungeonText = `🏰 地牢 B${dungeonPlayer.floor}F 冒险中`;
+            ctx.font='400 12px "Pixelify Sans",sans-serif';
+            const bw=ctx.measureText(dungeonText).width+24, bh=26;
+            const bx=cx2-bw/2, by=sy-60+floatY;
+            ctx.fillStyle='rgba(30, 20, 50, 0.95)'; ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,8); ctx.fill();
+            ctx.strokeStyle='#8b6914'; ctx.lineWidth=2/camera.zoom; ctx.stroke();
+            ctx.fillStyle='#ffd700'; ctx.textAlign='center';
+            ctx.fillText(dungeonText, cx2, by+bh/2+1);
+          }
+
           ctx.restore();
         });
       });
@@ -1113,6 +1130,7 @@
       const players=Object.values(clientPlayers).filter(p=>p.name!=='Observer');
       aiCountEl.textContent=`${players.length} online`;
       aiListEl.innerHTML='';
+      const dungeonIds = new Set(dungeonPlayers.map(p => p.id));
       players.forEach(p=>{
         const wrap=document.createElement('div');
         wrap.className='ai-avatar-wrap'+(selectedPlayerId===p.id?' selected':'');
@@ -1130,6 +1148,20 @@
         const dot=document.createElement('span'); dot.className='ai-avatar-dot '+statusClass;
         const nameEl=document.createElement('span'); nameEl.className='ai-avatar-name'; nameEl.textContent=p.name;
         wrap.appendChild(ac); wrap.appendChild(dot); wrap.appendChild(nameEl);
+
+        // 地牢标记
+        const dungeonPlayer = dungeonPlayers.find(dp => dp.name === p.name || dp.id === p.id);
+        if (dungeonPlayer) {
+          wrap.classList.add('in-dungeon');
+          wrap.dataset.playerId = dungeonPlayer.id;
+          wrap.dataset.dungeonFloor = dungeonPlayer.floor;
+          const badge = document.createElement('span');
+          badge.className = 'dungeon-badge';
+          badge.innerHTML = `🏰B${dungeonPlayer.floor}F`;
+          badge.title = `${dungeonPlayer.alive ? '🟢' : '💀'} 地牢 B${dungeonPlayer.floor}F${dungeonPlayer.inCombat ? ' ⚔️战斗中' : ''}`;
+          wrap.appendChild(badge);
+        }
+
         wrap.addEventListener('click',()=>{
           if(selectedPlayerId===p.id){ selectedPlayerId=null; isCameraFollowing=false; activityDetailEl.classList.remove('visible'); }
           else selectAndFollowPlayer(p.id);
@@ -1507,6 +1539,458 @@
     window.showZonePopup = showZonePopup;
     window.closeZonePopup = closeZonePopup;
     window.supplyZone = supplyZone;
+
+    // ==========================================
+    // === 地牢系统 ===
+    // ==========================================
+    let dungeonPlayers = []; // 在地牢中的玩家列表
+    let dungeonViewData = null; // 当前查看的地牢视角数据
+    let dungeonViewPlayerId = null; // 当前查看的玩家ID
+    let dungeonSceneMode = false; // 是否在地牢场景模式
+    let dungeonScenePlayerId = null; // 地牢场景对应的玩家ID
+    let dungeonSceneData = null; // 地牢场景数据
+    let dungeonTileSize = 28; // 地牢 tile 大小（增大以填满窗口）
+
+    // 地牢 tile 颜色配置
+    const DUNGEON_COLORS = {
+      wall: '#2d2d44',
+      wallStroke: '#4a4a6a',
+      floor: '#1a1a2e',
+      floorStroke: '#252540',
+      door: '#8b6914',
+      stairs: '#4fc3f7',
+      exit: '#50fa7b',
+      chest: '#ffd700',
+      player: '#74b9ff',
+      monster: '#ff6b6b',
+      fog: '#0a0a14',
+      visible: 1.0,
+      explored: 0.6,
+    };
+
+    // 计算最佳 tile 尺寸以填满视口
+    function calculateDungeonTileSize(mapWidth, mapHeight) {
+      const tileByWidth = Math.floor(VIEWPORT_W / mapWidth);
+      const tileByHeight = Math.floor((VIEWPORT_H - 50) / mapHeight); // 减去状态栏高度
+      return Math.max(16, Math.min(40, Math.min(tileByWidth, tileByHeight)));
+    }
+
+    // 获取在地牢中的玩家列表
+    function fetchDungeonPlayers() {
+      fetch('/api/dungeon/players')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && data.players) {
+            dungeonPlayers = data.players;
+            updateAiPanel();
+          }
+        })
+        .catch(() => {});
+    }
+    setInterval(fetchDungeonPlayers, 2000);
+    fetchDungeonPlayers();
+
+    // 显示地牢视角弹窗
+    function showDungeonView(playerId, playerName) {
+      const popup = document.getElementById('dungeon-popup');
+      const titleEl = document.getElementById('dungeon-popup-title');
+      const contentEl = document.getElementById('dungeon-popup-content');
+      if (!popup || !contentEl) return;
+
+      titleEl.textContent = `🏰 ${playerName} 的地牢视角`;
+      contentEl.innerHTML = '<div class="dungeon-loading">加载中...</div>';
+      popup.style.display = 'block';
+      dungeonViewPlayerId = playerId;
+
+      fetchDungeonView(playerId);
+    }
+
+    function fetchDungeonView(playerId) {
+      fetch(`/api/dungeon/view/${playerId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data || data.error) {
+            document.getElementById('dungeon-popup-content').innerHTML = 
+              `<div class="dungeon-error">${data?.error || '无法获取地牢数据'}</div>`;
+            return;
+          }
+          dungeonViewData = data;
+          renderDungeonView(data);
+        })
+        .catch(() => {
+          document.getElementById('dungeon-popup-content').innerHTML = 
+            '<div class="dungeon-error">请求失败</div>';
+        });
+    }
+
+    function renderDungeonView(data) {
+      const contentEl = document.getElementById('dungeon-popup-content');
+      const { view, status, floor, alive, inCombat, monsters, chests } = data;
+
+      let html = '<div class="dungeon-view-container">';
+      
+      // 状态栏
+      html += '<div class="dungeon-status-bar">';
+      html += `<span class="${alive ? 'dungeon-alive' : 'dungeon-dead'}">${alive ? '🟢' : '💀'} ${status.split('\n')[0]}</span>`;
+      html += `<span class="dungeon-floor">B${floor}F</span>`;
+      if (inCombat) {
+        html += `<span class="dungeon-combat">⚔️ ${inCombat.emoji} ${inCombat.name} (HP:${inCombat.hp}/${inCombat.maxHp})</span>`;
+      }
+      html += '</div>';
+
+      // 地图渲染
+      html += '<div class="dungeon-map-wrapper">';
+      html += '<pre class="dungeon-map">' + escapeHtml(view) + '</pre>';
+      html += '</div>';
+
+      // 图例
+      html += '<div class="dungeon-legend">';
+      html += '<span><strong>@</strong> 玩家</span>';
+      html += '<span><strong>></strong> 楼梯</span>';
+      html += '<span><strong><</strong> 出口</span>';
+      html += '<span><strong>$</strong> 宝箱</span>';
+      html += '<span><strong>M</strong> 怪物</span>';
+      html += '</div>';
+
+      // 可见怪物列表
+      if (monsters && monsters.length > 0) {
+        html += '<div class="dungeon-monsters">';
+        html += '<strong>可见怪物:</strong>';
+        for (const m of monsters.slice(0, 5)) {
+          const hpClass = m.hp < m.maxHp * 0.3 ? 'low-hp' : '';
+          html += `<span class="dungeon-monster ${hpClass}">${m.emoji} ${m.name} (${m.hp}/${m.maxHp})</span>`;
+        }
+        if (monsters.length > 5) html += `<span>+${monsters.length - 5} 更多</span>`;
+        html += '</div>';
+      }
+
+      html += '</div>';
+      contentEl.innerHTML = html;
+
+      // 自动刷新（如果在战斗中则更频繁）
+      const refreshInterval = inCombat ? 3000 : 8000;
+      if (window._dungeonRefreshTimer) clearTimeout(window._dungeonRefreshTimer);
+      window._dungeonRefreshTimer = setTimeout(() => {
+        if (document.getElementById('dungeon-popup').style.display !== 'none' && dungeonViewPlayerId) {
+          fetchDungeonView(dungeonViewPlayerId);
+        }
+      }, refreshInterval);
+    }
+
+    function closeDungeonPopup() {
+      const popup = document.getElementById('dungeon-popup');
+      if (popup) popup.style.display = 'none';
+      dungeonViewPlayerId = null;
+      dungeonViewData = null;
+      if (window._dungeonRefreshTimer) clearTimeout(window._dungeonRefreshTimer);
+    }
+
+    window.showDungeonView = showDungeonView;
+    window.closeDungeonPopup = closeDungeonPopup;
+
+    // ==========================================
+    // === 地牢场景模式 ===
+    // ==========================================
+    function enterDungeonSceneMode(playerId, playerName) {
+      dungeonSceneMode = true;
+      dungeonScenePlayerId = playerId;
+      document.getElementById('status-text').textContent = `🏰 ${playerName} 的地牢视角 — 按 ESC 或点击"退出"返回`;
+      
+      // 添加退出按钮
+      let exitBtn = document.getElementById('dungeon-exit-btn');
+      if (!exitBtn) {
+        exitBtn = document.createElement('button');
+        exitBtn.id = 'dungeon-exit-btn';
+        exitBtn.className = 'tool-btn';
+        exitBtn.textContent = '退出地牢';
+        exitBtn.onclick = exitDungeonSceneMode;
+        document.getElementById('toolbar').appendChild(exitBtn);
+      }
+      exitBtn.style.display = 'inline-block';
+      
+      fetchDungeonSceneData();
+    }
+
+    function exitDungeonSceneMode() {
+      dungeonSceneMode = false;
+      dungeonScenePlayerId = null;
+      dungeonSceneData = null;
+      document.getElementById('status-text').textContent = "Connected - Let your OpenClaw or ClaudeCode Join the World!";
+      const exitBtn = document.getElementById('dungeon-exit-btn');
+      if (exitBtn) exitBtn.style.display = 'none';
+    }
+
+    function fetchDungeonSceneData() {
+      if (!dungeonScenePlayerId) return;
+      fetch(`/api/dungeon/view/${dungeonScenePlayerId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data && !data.error) {
+            dungeonSceneData = data;
+            // 更新地牢场景镜头
+            if (data.tiles) {
+              const mapW = data.width * dungeonTileSize;
+              const mapH = data.height * dungeonTileSize;
+              camera.targetX = Math.max(0, data.x * dungeonTileSize - VIEWPORT_W / (2 * camera.zoom));
+              camera.targetY = Math.max(0, data.y * dungeonTileSize - VIEWPORT_H / (2 * camera.zoom));
+            }
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 地牢场景数据自动刷新
+    setInterval(() => {
+      if (dungeonSceneMode && dungeonScenePlayerId) {
+        fetchDungeonSceneData();
+      }
+    }, 2000);
+
+    // ESC 键退出地牢场景
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dungeonSceneMode) {
+        exitDungeonSceneMode();
+      }
+    });
+
+    // 绘制地牢场景
+    function drawDungeonScene() {
+      if (!dungeonSceneData || !dungeonSceneData.tiles) return;
+
+      const { tiles, width, height, x, y, monsterPositions, chestPositions, status, alive, inCombat } = dungeonSceneData;
+
+      // 清除画布
+      ctx.clearRect(0, 0, VIEWPORT_W, VIEWPORT_H);
+
+      // 计算最佳 tile 尺寸以填满视口
+      const tileSize = calculateDungeonTileSize(width, height);
+
+      // 计算地图总尺寸
+      const mapW = width * tileSize;
+      const mapH = height * tileSize;
+
+      // 居中显示
+      const offsetX = Math.max(0, (VIEWPORT_W - mapW) / 2);
+      const offsetY = Math.max(0, (VIEWPORT_H - mapH - 50) / 2); // 减去状态栏高度
+
+      // 绘制背景
+      ctx.fillStyle = '#0a0a14';
+      ctx.fillRect(0, 0, VIEWPORT_W, VIEWPORT_H);
+
+      ctx.save();
+      ctx.translate(offsetX, offsetY);
+
+      // 绘制地牢 tiles
+      for (let ty = 0; ty < tiles.length; ty++) {
+        for (let tx = 0; tx < tiles[ty].length; tx++) {
+          const tile = tiles[ty][tx];
+          const px = tx * tileSize;
+          const py = ty * tileSize;
+
+          if (!tile.explored) {
+            // 未探索区域 - 迷雾
+            ctx.fillStyle = DUNGEON_COLORS.fog;
+            ctx.fillRect(px, py, tileSize, tileSize);
+            continue;
+          }
+
+          // 根据 tile 类型绘制
+          let fillColor = DUNGEON_COLORS.floor;
+          let strokeColor = DUNGEON_COLORS.floorStroke;
+
+          switch (tile.type) {
+            case 'wall':
+              fillColor = DUNGEON_COLORS.wall;
+              strokeColor = DUNGEON_COLORS.wallStroke;
+              break;
+            case 'door':
+              fillColor = DUNGEON_COLORS.door;
+              break;
+            case 'stairs':
+              fillColor = DUNGEON_COLORS.stairs;
+              break;
+            case 'exit':
+              fillColor = DUNGEON_COLORS.exit;
+              break;
+            case 'chest':
+              fillColor = DUNGEON_COLORS.chest;
+              break;
+          }
+
+          ctx.globalAlpha = tile.visible ? DUNGEON_COLORS.visible : DUNGEON_COLORS.explored;
+          ctx.fillStyle = fillColor;
+          ctx.fillRect(px, py, tileSize, tileSize);
+
+          if (tile.type === 'wall') {
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 1;
+            ctx.strokeRect(px + 0.5, py + 0.5, tileSize - 1, tileSize - 1);
+          }
+
+          // 绘制特殊标记
+          if (tile.visible) {
+            ctx.globalAlpha = 1;
+            ctx.font = `bold ${Math.floor(tileSize * 0.6)}px "Pixelify Sans", monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (tile.type === 'stairs') {
+              ctx.fillStyle = '#fff';
+              ctx.fillText('>', px + tileSize / 2, py + tileSize / 2);
+            } else if (tile.type === 'exit') {
+              ctx.fillStyle = '#fff';
+              ctx.fillText('<', px + tileSize / 2, py + tileSize / 2);
+            } else if (tile.type === 'chest') {
+              ctx.fillStyle = '#000';
+              ctx.fillText('$', px + tileSize / 2, py + tileSize / 2);
+            }
+
+            // 绘制怪物
+            const monsterKey = `${tx},${ty}`;
+            if (monsterPositions && monsterPositions[monsterKey]) {
+              const m = monsterPositions[monsterKey];
+              ctx.fillStyle = DUNGEON_COLORS.monster;
+              ctx.beginPath();
+              ctx.arc(px + tileSize / 2, py + tileSize / 2, tileSize / 3, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.font = `${Math.floor(tileSize * 0.4)}px sans-serif`;
+              ctx.fillStyle = '#fff';
+              ctx.fillText(m.emoji, px + tileSize / 2, py + tileSize / 2);
+            }
+
+            // 绘制宝箱
+            if (chestPositions && chestPositions[monsterKey]) {
+              ctx.fillStyle = DUNGEON_COLORS.chest;
+              ctx.fillRect(px + 4, py + 4, tileSize - 8, tileSize - 8);
+            }
+          }
+        }
+      }
+
+      // 绘制玩家
+      ctx.globalAlpha = 1;
+      const px = x * tileSize + tileSize / 2;
+      const py = y * tileSize + tileSize / 2;
+
+      // 玩家光晕
+      ctx.fillStyle = 'rgba(116, 185, 255, 0.4)';
+      ctx.beginPath();
+      ctx.arc(px, py, tileSize * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 玩家圆点
+      ctx.fillStyle = DUNGEON_COLORS.player;
+      ctx.beginPath();
+      ctx.arc(px, py, tileSize / 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 玩家标记
+      ctx.font = `bold ${Math.floor(tileSize * 0.7)}px "Pixelify Sans", monospace`;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('@', px, py);
+
+      ctx.restore();
+
+      // 绘制状态栏（屏幕坐标）
+      ctx.save();
+      ctx.fillStyle = 'rgba(10, 10, 20, 0.9)';
+      ctx.fillRect(0, 0, VIEWPORT_W, 50);
+      ctx.font = '14px "Pixelify Sans", sans-serif';
+      ctx.fillStyle = alive ? '#50fa7b' : '#ff5555';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(alive ? '🟢' : '💀', 15, 25);
+
+      if (status) {
+        const statusLines = status.split('\n');
+        ctx.fillStyle = '#e0e0e0';
+        ctx.fillText(statusLines[0] || '', 40, 20);
+        ctx.font = '12px "Pixelify Sans", sans-serif';
+        ctx.fillStyle = '#a0a0a0';
+        ctx.fillText(statusLines[1] || '', 40, 38);
+      }
+
+      // 战斗状态
+      if (inCombat) {
+        ctx.fillStyle = '#ff6b6b';
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 14px "Pixelify Sans", sans-serif';
+        ctx.fillText(`⚔️ ${inCombat.emoji} ${inCombat.name} (${inCombat.hp}/${inCombat.maxHp})`, VIEWPORT_W - 15, 25);
+      }
+
+      // 显示楼层
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 16px "Pixelify Sans", sans-serif';
+      ctx.fillText(`🏰 B${dungeonSceneData.floor}F`, VIEWPORT_W / 2, 25);
+
+      ctx.restore();
+    }
+
+    window.enterDungeonSceneMode = enterDungeonSceneMode;
+    window.exitDungeonSceneMode = exitDungeonSceneMode;
+
+    // 修改 selectAndFollowPlayer：检测是否在地牢中
+    const originalSelectAndFollowPlayer = selectAndFollowPlayer;
+    selectAndFollowPlayer = function(id) {
+      const player = dungeonPlayers.find(p => p.id === id);
+      if (player) {
+        // 玩家在地牢中，显示弹窗询问
+        showDungeonEnterPrompt(id, player.name, player.floor);
+        return;
+      }
+      originalSelectAndFollowPlayer(id);
+    };
+
+    function showDungeonEnterPrompt(playerId, playerName, floor) {
+      const popup = document.getElementById('dungeon-prompt-popup');
+      const titleEl = document.getElementById('dungeon-prompt-title');
+      if (!popup) {
+        // 创建弹窗
+        const newPopup = document.createElement('div');
+        newPopup.id = 'dungeon-prompt-popup';
+        newPopup.className = 'dungeon-prompt-popup';
+        newPopup.innerHTML = `
+          <div class="dungeon-prompt-content">
+            <h3 id="dungeon-prompt-title"></h3>
+            <p class="dungeon-prompt-desc"></p>
+            <div class="dungeon-prompt-btns">
+              <button class="dungeon-prompt-btn enter" onclick="enterDungeonView()">进入地牢视角</button>
+              <button class="dungeon-prompt-btn cancel" onclick="closeDungeonPromptPopup()">取消</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(newPopup);
+      }
+      const popupEl = document.getElementById('dungeon-prompt-popup');
+      document.getElementById('dungeon-prompt-title').textContent = `🏰 ${playerName} 正在地牢冒险`;
+      popupEl.querySelector('.dungeon-prompt-desc').textContent = 
+        `该玩家正在地牢 B${floor}F 中探索。是否要查看他的地牢视角？`;
+      popupEl.dataset.playerId = playerId;
+      popupEl.dataset.playerName = playerName;
+      popupEl.style.display = 'flex';
+    }
+
+    function closeDungeonPromptPopup() {
+      const popup = document.getElementById('dungeon-prompt-popup');
+      if (popup) popup.style.display = 'none';
+    }
+
+    function enterDungeonView() {
+      const popup = document.getElementById('dungeon-prompt-popup');
+      if (!popup) return;
+      const playerId = popup.dataset.playerId;
+      const playerName = popup.dataset.playerName;
+      popup.style.display = 'none';
+      // 关闭弹窗，进入场景模式
+      closeDungeonPopup();
+      enterDungeonSceneMode(playerId, playerName);
+    }
+
+    window.closeDungeonPromptPopup = closeDungeonPromptPopup;
+    window.enterDungeonView = enterDungeonView;
 
     // 页面脚本只启动一次，真正的重连交给 EventSource 自己处理。
     initialize();

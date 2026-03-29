@@ -37,6 +37,11 @@ pluginManager.setActivityEmitter((data) => {
   worldEngine.recordPluginActivity(data.id, data.text, data.type);
 });
 
+// 设置插件活跃时间更新：插件 ctx.touchAction() → 更新玩家 lastActionAt
+pluginManager.setTouchActionEmitter((playerId) => {
+  worldEngine.touchAction(playerId);
+});
+
 (async () => {
   // 加载内置基础插件
   await pluginManager.loadPlugin(new BaseStatsPlugin());
@@ -145,8 +150,43 @@ app.locals.npcManager = npcManager;
 
 // ── 优雅关闭：清理 NPC ──────────────────────────────────────────────────────
 function gracefulShutdown() {
+  console.log('\n🛑 正在关闭服务...');
+
+  // 1. 清理 NPC 管理器
   npcManager.stop();
-  server.close();
+
+  // 2. 清理世界引擎定时器
+  worldEngine.shutdown();
+
+  // 3. 卸载所有插件
+  for (const [pluginId] of pluginManager._plugins) {
+    try {
+      pluginManager.unloadPlugin(pluginId);
+    } catch (err) {
+      console.error(`卸载插件 ${pluginId} 失败:`, err.message);
+    }
+  }
+
+  // 4. 关闭所有 SSE 连接
+  sseClients.forEach(c => {
+    try {
+      c.res.end();
+    } catch {}
+  });
+  sseClients = [];
+
+  // 5. 关闭 HTTP 服务器
+  server.close(() => {
+    console.log('✅ 服务已关闭');
+    process.exit(0);
+  });
+
+  // 6. 强制退出超时
+  setTimeout(() => {
+    console.log('⚠️ 强制退出');
+    process.exit(1);
+  }, 3000);
 }
+
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);

@@ -272,10 +272,12 @@ class PluginContext extends IPluginContext {
     }
   }
 
-  /**
-   * 内部方法：清理此插件注册的所有事件监听。
-   * @private
-   */
+  touchAction(playerId) {
+    if (typeof this._hooks.touchActionEmitter === 'function') {
+      this._hooks.touchActionEmitter(playerId);
+    }
+  }
+
   _cleanupEvents() {
     for (const fn of this._eventCleanups) {
       fn();

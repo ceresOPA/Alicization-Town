@@ -48,7 +48,6 @@ async function interact(args) {
 async function status(args) {
   const flags = parseFlags(args || []);
 
-  // 使用物品: status --use <itemKey>
   if (flags.use) {
     const { auth, result } = await runAuthenticated('POST', '/api/stats/use', { itemKey: flags.use });
     if (!result) throwForAuth(auth);
@@ -56,7 +55,6 @@ async function status(args) {
     return;
   }
 
-  // 装备物品: status --equip <itemKey>
   if (flags.equip) {
     const { auth, result } = await runAuthenticated('POST', '/api/stats/equip', { itemKey: flags.equip });
     if (!result) throwForAuth(auth);
@@ -64,7 +62,6 @@ async function status(args) {
     return;
   }
 
-  // 查看状态（默认）
   const { auth, result } = await runAuthenticated('GET', '/api/stats/status');
   if (!result) throwForAuth(auth);
 
@@ -89,7 +86,6 @@ async function status(args) {
   }
   text += `🎒 背包: ${result.inventoryCount} 件物品`;
 
-  // 背包详情
   try {
     const { result: inv } = await runAuthenticated('GET', '/api/stats/inventory');
     if (inv && inv.inventory && inv.inventory.length > 0) {
@@ -104,4 +100,91 @@ async function status(args) {
   console.log(text.trimEnd());
 }
 
-module.exports = { walk, chat, interact, status };
+async function dungeon(args) {
+  const flags = parseFlags(args);
+  const cmd = flags._[0];
+
+  if (!cmd || cmd === 'look') {
+    const { auth, result } = await runAuthenticated('GET', '/api/dungeon/look');
+    if (!result) throwForAuth(auth);
+    if (result.error) console.log(result.error);
+    else console.log(result.view || result.status || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'move' || cmd === 'm') {
+    const dir = flags._[1] || flags.dir;
+    if (!dir) throw new Error('用法: town dungeon move <n|s|e|w|ne|nw|se|sw>');
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/move', { direction: dir });
+    if (!result) throwForAuth(auth);
+    if (result.error) console.log(result.error);
+    else {
+      if (result.view) console.log(result.view);
+      if (result.msg) console.log(result.msg);
+    }
+    return;
+  }
+
+  if (cmd === 'attack' || cmd === 'a') {
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/attack');
+    if (!result) throwForAuth(auth);
+    console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'defend') {
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/defend');
+    if (!result) throwForAuth(auth);
+    console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'flee') {
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/flee');
+    if (!result) throwForAuth(auth);
+    console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'loot') {
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/loot');
+    if (!result) throwForAuth(auth);
+    console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'descend') {
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/descend');
+    if (!result) throwForAuth(auth);
+    console.log(result.msg || result.error || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'status') {
+    const { auth, result } = await runAuthenticated('GET', '/api/dungeon/status');
+    if (!result) throwForAuth(auth);
+    console.log(result.status || result.error || JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (cmd === 'exit') {
+    const { auth, result } = await runAuthenticated('POST', '/api/dungeon/exit');
+    if (!result) throwForAuth(auth);
+    console.log(result.msg || result.error || JSON.stringify(result));
+    return;
+  }
+
+  console.log(`用法: town dungeon <command>
+命令:
+  look      查看周围
+  move <n|s|e|w|ne|nw|se|sw>  移动
+  attack    攻击
+  defend    防御
+  flee      逃跑
+  loot      开宝箱
+  descend   下楼
+  status    状态
+  exit      退出地牢`);
+}
+
+module.exports = { walk, chat, interact, status, dungeon };
