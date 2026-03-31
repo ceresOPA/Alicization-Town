@@ -39,6 +39,20 @@ const playerActivities = {};
 const walkAborts = new Map();
 const events = new EventEmitter();
 
+const ZONE_REWARDS = {
+  weapon: { xp: 10, gold: 5 },
+  practice: { xp: 10, gold: 0 },
+  restaurant: { xp: 5, gold: 0 },
+  inn: { xp: 5, gold: 0 },
+  dock: { xp: 0, gold: 10 },
+  pond: { xp: 0, gold: 5 },
+  farm: { xp: 5, gold: 0 },
+  blacksmith: { xp: 10, gold: 0 },
+  shrine: { xp: 5, gold: 0 },
+  marketplace: { xp: 3, gold: 5 },
+  hotspring: { xp: 5, gold: 0 },
+};
+
 /** @type {import('./plugin-manager').PluginManager|null} */
 let pluginManager = null;
 
@@ -317,6 +331,56 @@ function getProfileByHandle(handle) {
   return sqliteStateStore.getProfileByHandle(handle);
 }
 
+function getOrCreateCharacter(profileId, name) {
+  const existing = sqliteStateStore.getCharacterByProfileId(profileId);
+  if (existing) return existing;
+
+  const now = new Date().toISOString();
+  const character = sqliteStateStore.createCharacter({
+    id: nextSnowflakeId(),
+    profileId,
+    name,
+    level: 1,
+    xp: 0,
+    hp: 100,
+    maxHp: 100,
+    str: 5,
+    dex: 5,
+    int: 5,
+    vit: 5,
+    gold: 50,
+    statPoints: 0,
+    skillPoints: 0,
+    createdAt: now,
+    updatedAt: now,
+  });
+  return character;
+}
+
+function getCharacter(profileId) {
+  return sqliteStateStore.getCharacterByProfileId(profileId);
+}
+
+function getCharacterById(id) {
+  return sqliteStateStore.getCharacter(id);
+}
+
+function updateCharacter(id, updates) {
+  return sqliteStateStore.updateCharacter(id, updates);
+}
+
+function addCharacterXp(id, amount) {
+  return sqliteStateStore.addCharacterXp(id, amount);
+}
+
+function addCharacterGold(id, amount) {
+  return sqliteStateStore.addCharacterGold(id, amount);
+}
+
+function allocateStatPoint(id, stat) {
+  return sqliteStateStore.allocateStatPoint(id, stat);
+}
+
 function verifyLoginProof(profile, timestamp, signature) {
   if (!profile || !profile.publicKey || typeof signature !== 'string') return false;
   if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) return false;
@@ -361,6 +425,7 @@ function loginProfile(handle, timestamp, signature) {
   const token = crypto.randomUUID();
   const now = Date.now();
   const player = join(profile.id, profile.name, profile.sprite, { trackActivity: true });
+  const character = getOrCreateCharacter(profile.id, profile.name);
   const session = {
     id: profile.id,
     playerId: profile.id,
@@ -385,6 +450,7 @@ function loginProfile(handle, timestamp, signature) {
     expires_at: new Date(session.expiresAt).toISOString(),
     lease_expires_at: new Date(session.leaseExpiresAt).toISOString(),
     player: sanitize(player),
+    character,
     message: hadActiveSession ? `已接管角色 ${profile.name} 的在线会话。` : `已登录角色 ${profile.name}。`,
   };
 }
@@ -691,6 +757,36 @@ function interact(playerId, item) {
   player.interactionText = result.action;
   player.interactionIcon = result.icon || '';
   player.interactionSound = result.sound || 'interact';
+
+  // Determine zone category for rewards
+  let zoneCategory = null;
+  if (zone) {
+    const normalizedName = (zone.name || '').toLowerCase();
+    for (const [matcher, category] of ZONE_CATEGORY_MAP) {
+      if (matcher.test(normalizedName)) {
+        zoneCategory = category;
+        break;
+      }
+    }
+  }
+
+  // Grant XP/Gold rewards if applicable
+  const rewards = ZONE_REWARDS[zoneCategory];
+  let rewardText = '';
+  if (rewards) {
+    const character = getOrCreateCharacter(playerId, player.name);
+    if (character) {
+      if (rewards.xp > 0) {
+        addCharacterXp(character.id, rewards.xp);
+        rewardText += ` +${rewards.xp} XP`;
+      }
+      if (rewards.gold > 0) {
+        addCharacterGold(character.id, rewards.gold);
+        rewardText += ` +${rewards.gold} Gold`;
+      }
+    }
+  }
+
   emitPerception('interact', playerId, player.name, player.x, player.y, { zone: zone ? zone.name : '小镇街道', action: result.action });
   broadcast();
   setTimeout(() => {
@@ -712,8 +808,8 @@ function interact(playerId, item) {
     item: result.item || item || null,
   };
   events.emit('interaction', entry);
-  addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}` });
-  return { zone: zone ? zone.name : '小镇街道', ...result };
+  addActivity(playerId, { type: 'interact', text: `在${zone ? zone.name : '街道'}: ${result.action}${rewardText}` });
+  return { zone: zone ? zone.name : '小镇街道', rewards: rewards || null, ...result };
 }
 
 function look(playerId) {
@@ -777,6 +873,13 @@ module.exports = {
   getTokenSession,
   getProfile,
   getProfileByHandle,
+  getOrCreateCharacter,
+  getCharacter,
+  getCharacterById,
+  updateCharacter,
+  addCharacterXp,
+  addCharacterGold,
+  allocateStatPoint,
   pruneExpiredSessions,
   join,
   removePlayer,

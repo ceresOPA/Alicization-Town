@@ -26,6 +26,49 @@ router.get('/characters', (_req, res) => {
   res.json({ characters: worldEngine.getCharacterList() });
 });
 
+router.get('/characters/:profileId', requireSession, (req, res) => {
+  const { profileId } = req.params;
+  const character = worldEngine.getCharacter(profileId);
+  if (!character) return res.status(404).json({ error: '角色不存在' });
+  res.json(character);
+});
+
+router.put('/characters/:id', requireSession, (req, res) => {
+  const { id } = req.params;
+  const updates = req.body || {};
+  const character = worldEngine.getCharacterById(id);
+  if (!character) return res.status(404).json({ error: '角色不存在' });
+  const updated = worldEngine.updateCharacter(id, updates);
+  res.json(updated);
+});
+
+router.post('/characters/:id/xp', requireSession, (req, res) => {
+  const { id } = req.params;
+  const { amount } = req.body || {};
+  if (typeof amount !== 'number') return res.status(400).json({ error: '缺少 amount 字段' });
+  const character = worldEngine.addCharacterXp(id, amount);
+  if (!character) return res.status(404).json({ error: '角色不存在' });
+  res.json(character);
+});
+
+router.post('/characters/:id/gold', requireSession, (req, res) => {
+  const { id } = req.params;
+  const { amount } = req.body || {};
+  if (typeof amount !== 'number') return res.status(400).json({ error: '缺少 amount 字段' });
+  const character = worldEngine.addCharacterGold(id, amount);
+  if (!character) return res.status(404).json({ error: '角色不存在' });
+  res.json(character);
+});
+
+router.post('/characters/:id/stats', requireSession, (req, res) => {
+  const { id } = req.params;
+  const { stat } = req.body || {};
+  if (!stat) return res.status(400).json({ error: '缺少 stat 字段' });
+  const character = worldEngine.allocateStatPoint(id, stat);
+  if (!character) return res.status(400).json({ error: '角色不存在或没有可分配的点数' });
+  res.json(character);
+});
+
 router.get('/map', maybeSession, (req, res) => {
   res.json({ directory: worldEngine.readMap(req.requestHandle?.playerId || null) });
 });
