@@ -32,6 +32,12 @@ const definitions = [
     inputSchema: { type: 'object', properties: {} },
     annotations: { title: 'Characters', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
   },
+  {
+    name: 'check_character',
+    description: '查看当前登录角色的属性面板，包括等级、经验、生命值、属性点和金币等',
+    inputSchema: { type: 'object', properties: {} },
+    annotations: { title: 'Check Character', readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+  },
 ];
 
 async function handle(name, args, client) {
@@ -51,6 +57,14 @@ async function handle(name, args, client) {
   if (name === 'characters') {
     const characters = await client.getCharacters();
     return { content: [{ type: 'text', text: client.formatCharacters(characters) }] };
+  }
+
+  if (name === 'check_character') {
+    const character = await client.getCharacter();
+    if (!character) {
+      return { content: [{ type: 'text', text: '你还没有登录角色，请先使用 login 命令登录。' }] };
+    }
+    return { content: [{ type: 'text', text: client.formatCharacter(character) }] };
   }
 
   return null;

@@ -40,6 +40,26 @@ class SQLiteStateStore {
         profile_id TEXT PRIMARY KEY,
         token TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS characters (
+        id TEXT PRIMARY KEY,
+        profile_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        level INTEGER DEFAULT 1,
+        xp INTEGER DEFAULT 0,
+        hp INTEGER,
+        max_hp INTEGER,
+        str INTEGER DEFAULT 1,
+        dex INTEGER DEFAULT 1,
+        int INTEGER DEFAULT 1,
+        vit INTEGER DEFAULT 1,
+        gold INTEGER DEFAULT 0,
+        stat_points INTEGER DEFAULT 0,
+        skill_points INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (profile_id) REFERENCES profiles(id)
+      );
     `);
 
     const columns = new Set(
@@ -55,6 +75,7 @@ class SQLiteStateStore {
     this.database.exec(`
       CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_handle ON profiles(handle);
       CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_public_key ON profiles(public_key);
+      CREATE INDEX IF NOT EXISTS idx_characters_profile_id ON characters(profile_id);
     `);
   }
 
@@ -195,6 +216,143 @@ class SQLiteStateStore {
       DELETE FROM active_profile_sessions
       WHERE profile_id = ?
     `).run(profileId);
+  }
+
+  createCharacter(character) {
+    const existing = this.getCharacterByProfileId(character.profileId);
+    if (existing) return existing;
+
+    this.database.prepare(`
+      INSERT INTO characters (id, profile_id, name, level, xp, hp, max_hp, str, dex, int, vit, gold, stat_points, skill_points, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      character.id,
+      character.profileId,
+      character.name,
+      character.level || 1,
+      character.xp || 0,
+      character.hp,
+      character.maxHp,
+      character.str || 1,
+      character.dex || 1,
+      character.int || 1,
+      character.vit || 1,
+      character.gold || 0,
+      character.statPoints || 0,
+      character.skillPoints || 0,
+      character.createdAt,
+      character.updatedAt,
+    );
+
+    return this.getCharacter(character.id);
+  }
+
+  getCharacter(id) {
+    const row = this.database.prepare(`
+      SELECT id, profile_id AS profileId, name, level, xp, hp, max_hp AS maxHp, str, dex, int, vit, gold, stat_points AS statPoints, skill_points AS skillPoints, created_at AS createdAt, updated_at AS updatedAt
+      FROM characters
+      WHERE id = ?
+    `).get(id);
+    return row || null;
+  }
+
+  getCharacterByProfileId(profileId) {
+    const row = this.database.prepare(`
+      SELECT id, profile_id AS profileId, name, level, xp, hp, max_hp AS maxHp, str, dex, int, vit, gold, stat_points AS statPoints, skill_points AS skillPoints, created_at AS createdAt, updated_at AS updatedAt
+      FROM characters
+      WHERE profile_id = ?
+    `).get(profileId);
+    return row || null;
+  }
+
+  updateCharacter(id, updates) {
+    const character = this.getCharacter(id);
+    if (!character) return null;
+
+    const updated = { ...character, ...updates, updatedAt: new Date().toISOString() };
+
+    this.database.prepare(`
+      UPDATE characters
+      SET name = ?, level = ?, xp = ?, hp = ?, max_hp = ?, str = ?, dex = ?, int = ?, vit = ?, gold = ?, stat_points = ?, skill_points = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      updated.name,
+      updated.level,
+      updated.xp,
+      updated.hp,
+      updated.maxHp,
+      updated.str,
+      updated.dex,
+      updated.int,
+      updated.vit,
+      updated.gold,
+      updated.statPoints,
+      updated.skillPoints,
+      updated.updatedAt,
+      id,
+    );
+
+    return this.getCharacter(id);
+  }
+
+  addCharacterXp(id, xpAmount) {
+    const character = this.getCharacter(id);
+    if (!character) return null;
+
+    const newXp = character.xp + xpAmount;
+    const newLevel = Math.floor(newXp / 100) + 1;
+    const leveledUp = newLevel > character.level;
+    const statPointsGained = leveledUp ? (newLevel - character.level) * 3 : 0;
+
+    this.database.prepare(`
+      UPDATE characters
+      SET xp = ?, level = ?, stat_points = stat_points + ?, updated_at = ?
+      WHERE id = ?
+    `).run(newXp, newLevel, statPointsGained, new Date().toISOString(), id);
+
+    return this.getCharacter(id);
+  }
+
+  addCharacterGold(id, goldAmount) {
+    const character = this.getCharacter(id);
+    if (!character) return null;
+
+    this.database.prepare(`
+      UPDATE characters
+      SET gold = gold + ?, updated_at = ?
+      WHERE id = ?
+    `).run(goldAmount, new Date().toISOString(), id);
+
+    return this.getCharacter(id);
+  }
+
+  updateCharacterHp(id, hp) {
+    const character = this.getCharacter(id);
+    if (!character) return null;
+
+    this.database.prepare(`
+      UPDATE characters
+      SET hp = ?, updated_at = ?
+      WHERE id = ?
+    `).run(hp, new Date().toISOString(), id);
+
+    return this.getCharacter(id);
+  }
+
+  allocateStatPoint(id, stat) {
+    const character = this.getCharacter(id);
+    if (!character || character.statPoints <= 0) return null;
+
+    const validStats = ['str', 'dex', 'int', 'vit'];
+    if (!validStats.includes(stat)) return null;
+
+    this.database.prepare(`
+      UPDATE characters
+      SET ${stat} = ${stat} + 1, stat_points = stat_points - 1, updated_at = ?
+      WHERE id = ?
+    `).run(new Date().toISOString(), id);
+
+    return this.getCharacter(id);
   }
 }
 

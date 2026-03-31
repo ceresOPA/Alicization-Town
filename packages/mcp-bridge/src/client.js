@@ -96,6 +96,15 @@ async function getCharacters() {
   return result.characters || [];
 }
 
+async function getCharacter() {
+  const profile = activeHandle.resolveProfileName();
+  if (!profile) return null;
+  const profileData = townClient.loadProfile(profile);
+  if (!profileData) return null;
+  const { result } = await authenticatedRequest('GET', `/api/characters/${profileData.id}`);
+  return result || null;
+}
+
 async function authenticatedRequest(method, apiPath, body) {
   const { auth, result, profile } = await activeHandle.request(method, apiPath, body);
   if (profile?.profile) setActiveProfileName(profile.profile);
@@ -250,6 +259,24 @@ function flushContext() {
   });
 }
 
+function formatCharacter(character) {
+  if (!character) return '你还没有登录角色。';
+
+  let text = `🎭 【${character.name} 的角色面板】\n\n`;
+  text += `⭐ 等级: ${character.level} (经验: ${character.xp})\n`;
+  text += `❤️ 生命: ${character.hp}/${character.maxHp}\n`;
+  text += `💰 金币: ${character.gold}\n\n`;
+  text += `📈 属性:\n`;
+  text += `  力 ${character.str} (STR)\n`;
+  text += `  敏 ${character.dex} (DEX)\n`;
+  text += `  智 ${character.int} (INT)\n`;
+  text += `  体 ${character.vit} (VIT)\n\n`;
+  text += `🎁 可分配点数: ${character.statPoints}\n`;
+  text += `✨ 技能点数: ${character.skillPoints}`;
+
+  return text;
+}
+
 module.exports = {
   connect,
   disconnect,
@@ -257,6 +284,7 @@ module.exports = {
   logout,
   listProfiles,
   getCharacters,
+  getCharacter,
   getMap,
   look,
   walk,
@@ -273,6 +301,7 @@ module.exports = {
   formatLogin: townClient.formatLogin,
   formatProfilesList: townClient.formatProfilesList,
   formatCharacters: townClient.formatCharacters,
+  formatCharacter,
   formatMap: townClient.formatMap,
   formatLook: townClient.formatLook,
   formatWalk: townClient.formatWalk,
