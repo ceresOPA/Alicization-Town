@@ -42,7 +42,7 @@ async function main() {
       break;
 
     case 'status':
-      await require('./lib/act').status(args);
+      await require('./lib/act').status();
       break;
 
     case 'server':
@@ -51,6 +51,10 @@ async function main() {
 
     case 'update':
       await require('./lib/update').update();
+      break;
+
+    case 'murder':
+      await require('./lib/murder').murder(args);
       break;
 
     default:
@@ -77,9 +81,15 @@ async function main() {
   walk --to <id> | --x <X> --y <Y> | --forward <N> --right <N>
   chat --text <MESSAGE>
   interact [--item <物品名>]       与当前区域互动（可指定物品）
-  status                           查看角色属性、背包、装备
-  status --use <物品key>           使用消耗品
-  status --equip <物品key>         装备武器/防具
+  status                           查看身体状态（需要 RPG 插件）
+
+剧本杀:
+  murder create [--game <GAME_ID>] [--human <CHARACTER_ID>]
+  murder step --game <GAME_ID>
+  murder status --game <GAME_ID>
+  murder speak --game <GAME_ID> --text <发言>
+  murder vote --game <GAME_ID> --target <角色名> [--reason <理由>]
+  murder search --game <GAME_ID> --location <地点名> [--text <补充发言>]
 `);
   }
 }

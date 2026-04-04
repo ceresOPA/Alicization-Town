@@ -275,6 +275,44 @@ async function getChat(since, limit) {
   return result || { messages: [], cursor: 0 };
 }
 
+async function murderCreateGame({ gameId, humanCharacterId } = {}) {
+  const body = {};
+  if (gameId) body.gameId = gameId;
+  if (humanCharacterId) body.humanCharacterId = humanCharacterId;
+  return authenticatedRequest('POST', '/api/plugins/murder/games', body);
+}
+
+async function murderStep(gameId) {
+  return authenticatedRequest('POST', `/api/plugins/murder/games/${encodeURIComponent(gameId)}/step`);
+}
+
+async function murderGetState(gameId) {
+  return authenticatedRequest('GET', `/api/plugins/murder/games/${encodeURIComponent(gameId)}`);
+}
+
+async function murderSubmitInput(gameId, input) {
+  return authenticatedRequest('POST', `/api/plugins/murder/games/${encodeURIComponent(gameId)}/input`, { input });
+}
+
+async function murderUseSkill(gameId, { characterId, target, description }) {
+  const body = { characterId };
+  if (target) body.target = target;
+  if (description) body.description = description;
+  return authenticatedRequest('POST', `/api/plugins/murder/games/${encodeURIComponent(gameId)}/skill`, body);
+}
+
+async function murderAttemptKill(gameId, { killerId, targetId }) {
+  return authenticatedRequest('POST', `/api/plugins/murder/games/${encodeURIComponent(gameId)}/kill`, { killerId, targetId });
+}
+
+async function murderSearchLocation(gameId, { characterId, location }) {
+  return authenticatedRequest('POST', `/api/plugins/murder/games/${encodeURIComponent(gameId)}/search`, { characterId, location });
+}
+
+async function murderAutoRun(gameId) {
+  return authenticatedRequest('POST', `/api/plugins/murder/games/${encodeURIComponent(gameId)}/autorun`, {});
+}
+
 function flushContext() {
   const messages = pendingNewMessages.splice(0, pendingNewMessages.length);
   const seen = new Set();
@@ -321,4 +359,12 @@ module.exports = {
   formatChat: townClient.formatChat,
   formatInteract: townClient.formatInteract,
   formatPerceptions: townClient.formatPerceptions,
+  murderCreateGame,
+  murderStep,
+  murderGetState,
+  murderSubmitInput,
+  murderUseSkill,
+  murderAttemptKill,
+  murderSearchLocation,
+  murderAutoRun,
 };
