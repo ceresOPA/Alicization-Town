@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "murder-script-v2",
+  "title": "剧本杀×鹅鸭杀 剧本格式 v2",
+  "description": "Alicization Town 剧本杀插件的剧本数据格式定义。",
+  "type": "object",
+  "required": ["id", "title", "version", "playerCount", "roundCount", "background", "locations", "evidenceFragments", "characters", "truth"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "剧本唯一标识符，如 midnight-manor-v2"
+    },
+    "title": {
+      "type": "string",
+      "description": "剧本显示名称"
+    },
+    "version": {
+      "type": "integer",
+      "const": 2,
+      "description": "剧本格式版本，固定为 2"
+    },
+    "playerCount": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 12,
+      "description": "玩家人数（含人类玩家）"
+    },
+    "roundCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "行动/会议循环轮数"
+    },
+    "background": {
+      "type": "string",
+      "minLength": 10,
+      "description": "剧本背景叙述（开场白）"
+    },
+    "locations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/definitions/Location"
+      },
+      "description": "可搜查地点列表"
+    },
+    "evidenceFragments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/EvidenceFragment"
+      },
+      "description": "证据碎片列表。同一 evidenceId 的碎片拼凑成完整线索。"
+    },
+    "characters": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/definitions/Character"
+      },
+      "description": "角色列表。playerCount 必须等于 characters.length。"
+    },
+    "truth": {
+      "$ref": "#/definitions/Truth",
+      "description": "真相揭晓信息"
+    }
+  },
+  "definitions": {
+    "RoleId": {
+      "type": "string",
+      "enum": ["coroner", "bodyguard", "tracker", "forger", "silencer", "eliminator", "dodo"],
+      "description": "角色技能ID。coroner=验尸官, bodyguard=保镖, tracker=跟踪者, forger=伪证师, silencer=消音者, eliminator=灭迹者, dodo=渡渡鸟"
+    },
+    "Location": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "searchableItems": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "该地点可搜索的物品提示（仅用于叙事，不影响碎片逻辑）"
+        }
+      }
+    },
+    "EvidenceFragment": {
+      "type": "object",
+      "required": ["fragmentId", "evidenceId", "pieceIndex", "totalPieces", "name", "locationId", "description", "isForged"],
+      "properties": {
+        "fragmentId": { "type": "string", "description": "碎片唯一ID" },
+        "evidenceId": { "type": "string", "description": "所属线索ID" },
+        "pieceIndex": { "type": "integer", "minimum": 0, "description": "在该线索中的顺序 (0-based)" },
+        "totalPieces": { "type": "integer", "minimum": 1, "description": "该线索总碎片数" },
+        "name": { "type": "string", "description": "碎片名称" },
+        "locationId": { "type": "string", "description": "所在地点ID（必须匹配 locations[].id）" },
+        "description": { "type": "string", "description": "碎片内容描述" },
+        "isForged": { "type": "boolean", "description": "是否为伪造证据（凶手方预置的假线索）" }
+      }
+    },
+    "Character": {
+      "type": "object",
+      "required": ["id", "name", "age", "profession", "roleId", "background", "secret", "objective", "isMurderer", "isVictim"],
+      "properties": {
+        "id": { "type": "string", "description": "角色唯一ID，格式建议 char_xxx" },
+        "name": { "type": "string" },
+        "age": { "type": "integer", "minimum": 1 },
+        "profession": { "type": "string" },
+        "roleId": { "$ref": "#/definitions/RoleId" },
+        "personalityTraits": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "性格标签，用于 AI 角色扮演"
+        },
+        "background": { "type": "string", "description": "角色公开背景" },
+        "secret": { "type": "string", "description": "角色私密信息（仅该角色可见）" },
+        "objective": { "type": "string", "description": "角色目标" },
+        "isMurderer": { "type": "boolean" },
+        "isVictim": { "type": "boolean" }
+      }
+    },
+    "Truth": {
+      "type": "object",
+      "required": ["murdererId", "summary"],
+      "properties": {
+        "murdererId": { "type": "string", "description": "凶手角色ID" },
+        "firstVictimId": {
+          "type": ["string", "null"],
+          "description": "开场预设死者角色ID（null 表示无预设死者）"
+        },
+        "victimName": { "type": "string", "description": "受害者显示名称" },
+        "summary": { "type": "string", "description": "真相揭晓文本" }
+      }
+    }
+  }
+}
