@@ -1,88 +1,257 @@
 # feat: 剧本杀×鹅鸭杀 混血玩法插件 — 核心引擎
 
-## 这是什么
+## Background
 
-为 Alicization Town 像素沙盒新增 **剧本杀 + 鹅鸭杀混血** 玩法插件。
+Alicization Town 当前是一个 AI 驱动的像素沙盒世界，NPC 能闲聊、能移动、有感知范围，但缺乏结构化的多人博弈玩法。
 
-这不是一个随便嵌入的小游戏。它是对"AI NPC 能不能玩社交推理"这个问题的一次完整验证：
+本 PR 为世界新增一个**剧本杀 + 鹅鸭杀混血**玩法插件，验证 "AI NPC 在像素世界里玩社交推理"这个方向是否成立。插件以 `IPlugin` 标准接口注册，不侵入核心 world-engine。
 
-- 3 阵营（侦探方 / 凶手方 / 中立·渡渡鸟）× 7 种角色能力
-- 实时行动阶段 + 轮制会议投票 × 3 轮循环
-- 12 片证据碎片分散在 4 个地点，调查与信息差是核心机制
-- AI 角色具有**性格差异化**的说话风格——不同性格特征映射到不同的语言指令
-- **纯 AI 对局观战（spectate）模式**——全程 autorun，通过 SSE 实时推送，观众可以看 AI 互相博弈
-- SSE 推送带**视角过滤安全机制**——游戏中隐藏敏感信息，仅在揭晓阶段完整展示
+## Solution Overview
 
-## 为什么做这个
+整个剧本杀系统通过单一插件包 `packages/town-plugin-murder/` 实现，不引入新的 prompt 框架或外部编排库。
 
-目前 AI 社交推理赛道（狼人杀/剧本杀）的开源项目大致分三类：
+包含：
 
-| 类型 | 代表 | 局限 |
+- 手动状态机引擎，管理 10 阶段游戏循环（SETUP→PROLOGUE→3×ACTION/MEETING→REVELATION→ENDED）
+- 3 阵营（detective/killer/neutral）× 7 角色技能系统
+- 证据碎片化：12 片碎片分散在 4 地点，搜查获取，可伪造
+- AI 性格差异化：16 种性格 trait → 具体说话风格指令映射，同一 LLM 模型上产生不同角色表现
+- 纯 AI 对局观战（autorun）模式：SSE 实时推送 + 视角安全过滤
+- LLM provider 抽象层，支持 OpenAI/DeepSeek/Anthropic，通过环境变量切换
+- per-character 向量记忆：`@huggingface/transformers` 本地 embedding（可选依赖）
+- 4 人剧本「午夜庄园谋杀案」+ JSON Schema (draft-07) 剧本格式规范
+
+## Data Model
+
+### GamePhase（10 阶段）
+
+```
+SETUP → PROLOGUE → ACTION_R1 → MEETING_R1 → ACTION_R2 → MEETING_R2 → ACTION_R3 → FINAL_VOTE → REVELATION → ENDED
+```
+
+`PHASE_ORDER` 数组硬编码顺序，`nextPhaseOf()` 线性推进。没有分支跳转——唯一的提前终结路径是胜负条件触发后直接跳至 `REVELATION`。
+
+### Faction 与 RoleId
+
+| RoleId | 阵营 | 名称 | 技能类型 | 限制 |
+|---|---|---|---|---|
+| `coroner` | detective | 验尸官 | 主动·查验阵营 | ∞次，每轮1次 |
+| `bodyguard` | detective | 保镖 | 主动·守护免杀 | ∞次，每轮1次 |
+| `tracker` | detective | 跟踪者 | 主动·查行踪 | ∞次，每轮1次 |
+| `forger` | killer | 伪证师 | 主动·伪造线索 | 全局2次，每轮1次 |
+| `silencer` | killer | 消音者 | 主动·禁言 | 全局1次，每轮1次 |
+| `eliminator` | killer | 灭迹者 | 被动·击杀不留尸 | — |
+| `dodo` | neutral | 渡渡鸟 | 被动·被放逐即胜 | — |
+
+每个角色有 `skillUsedThisRound` 和 `totalSkillUses` 两级计数。`canUseSkill()` 检查：非被动 → 本轮未满 `perRound` → 累计未满 `maxUses`。
+
+### State 结构（`createInitialState` 输出）
+
+```js
+{
+  gameId, phase, script, characters, humanCharacterId,
+  roles,                     // { charId: { roleId, faction, skillUsedThisRound, totalSkillUses } }
+  chatLog,                   // [{ speaker, characterId, content, phase, round, timestamp, emotion }]
+  evidenceFragments,         // 完整碎片池（含伪造碎片）
+  playerEvidence,            // { charId: [fragmentId, ...] } 私有证据
+  killedCharacters,          // [{ characterId, killedBy, round, visible, timestamp }]
+  protectedCharacterId,      // 本轮保镖守护目标
+  silencedCharacterId,       // 下轮会议禁言目标
+  actionLog,                 // [{ characterId, action, location, round, ts }]
+  meetingVotes,              // { voterId: votedCharId | null }
+  accusationHeat,            // { charId: number } 累积嫌疑热度
+  currentSpeaker, waitingForHuman, humanInput, result
+}
+```
+
+### Evidence Fragment Schema
+
+每个碎片属于一条 evidence（`evidenceId`），有 `pieceIndex/totalPieces` 标记完整度。搜查返回第一个本角色未持有的碎片（FIFO）。伪造碎片（`isForged: true`）混入同一池，对其他角色不可区分。
+
+## Algorithm And Rules
+
+### 行动阶段（_runActionPhase）
+
+1. 清除保镖守护 + 重置本轮技能计数
+2. 收集所有 AI 角色 → **`Promise.all` 并行**发送 LLM 请求
+3. **串行**应用决策到 state（避免竞态写入）
+4. AI 可选行动：`search`（搜证）、`skill`（使用技能）、`kill`（击杀）、`wait`
+
+### 击杀判定（processKillAttempt）
+
+```
+if (目标被保镖守护) → 击杀失败
+if (凶手是灭迹者) → visible = false (不留尸体)
+else → visible = true → 下轮会议公布
+```
+
+### 会议阶段（_runMeetingPhase → _runVoting）
+
+1. 公布新遇害者名单
+2. 轮流发言（被消音者 → 跳过输出"……（被消音，无法发言）"）
+3. 投票：支持弃票；`_resolveVotes` 计数排序
+4. **平票 → 重投一次**→ 仍平票 → 无人被放逐（凶手有利）
+5. 渡渡鸟被放逐 → 中立方胜利（提前结束）
+6. 凶手方核心（eliminator）被放逐 → 侦探方胜利
+7. 侦探方存活 < 2 → 凶手方胜利
+8. 最终投票轮仍未投出凶手 → 凶手方胜利
+9. 每轮投票后 accusationHeat 衰减
+
+### 超时机制
+
+`_handleTimeout()` 检查 `lastHeartbeatAt`，超过 `timeoutMs`（默认5分钟）则将人类玩家切换为 AI 接管。
+
+## AI Personality Differentiation
+
+竞品（如 ShadowPack）通过不同 temperature 或不同模型实现角色差异。本实现在 **同一模型** 上通过 prompt 指令实现：
+
+```
+TRAIT_STYLE: { '冲动': '语气急促，爱用感叹号和反问...', '冷静': '说话不急不缓...' }
+```
+
+16 种 trait → 具体说话方式指令。`buildPersonalityDirective(traits)` 将角色的 `personalityTraits` 数组翻译为编号指令列表，注入 system prompt。
+
+### Emotion Hint
+
+`makeLine()` 生成聊天条目时，通过 `inferEmotion()` 做关键词匹配（9 类情感词组），输出 `emotion` 字段。该字段作为 hint 供前端渲染表情气泡，当前无前端消费方。
+
+## SSE Broadcast And Security
+
+### 广播路径
+
+`_broadcast(gameId, event)` → `_sanitizeEvent()` → SSE `text/event-stream` 推送
+
+### 视角过滤规则（_sanitizeStateEvent）
+
+游戏进行中（非 REVELATION/ENDED）：从 `stateUpdate` 中 **剥离以下 6 个字段**：
+
+- `roles` — 阵营/角色身份
+- `protectedCharacterId` — 保镖守护目标
+- `silencedCharacterId` — 消音目标
+- `actionLog` — 行动日志
+- `evidenceFragments` — 完整碎片池
+- `playerEvidence` — 仅保留人类玩家自己的
+
+游戏结束后：完整暴露 `roles` 和 `playerEvidence`。
+
+`skill` / `kill` / `search` 事件仅广播 `{ type, timestamp }`，不暴露具体参数。
+
+### 并发保护（Autorun）
+
+`_autoRunning` Set 记录当前自动运行的 gameId。`step/useSkill/attemptKill/searchLocation/submitHumanInput` 入口全部检查此 Set，防止观战模式下手动操作竞态。
+
+## Plugin Integration
+
+`server/src/main.js` 处唯一改动：注册插件到 PluginManager。
+
+```js
+pluginManager.register(new TownPluginMurder());
+```
+
+插件通过 `ctx.registerRoute()` 注册 9 条 HTTP 路由（前缀 `/api/plugins/murder/`），通过 `ctx.onEvent()` 挂载事件监听（当前 MVP 不做自动触发，仅占位）。
+
+### HTTP Routes
+
+| Method | Path | 说明 |
 |---|---|---|
-| 纯 AI 对战竞技场 | wolfcha (558⭐), nightfall-ai-arena | 没有世界、没有空间、只有对话框 |
-| 叙事驱动单人体验 | ai-murder-mystery, infinite-echoes | 没有实时性、没有观众、没有像素世界 |
-| Web3 / 链上 | ShadowPack | 重经济不重叙事 |
+| POST | `/murder/games` | 创建游戏局 |
+| POST | `/murder/games/:gameId/step` | 推进一个阶段 |
+| POST | `/murder/games/:gameId/input` | 提交人类输入 |
+| GET | `/murder/games/:gameId` | 查询状态 |
+| POST | `/murder/games/:gameId/skill` | 使用角色技能 |
+| POST | `/murder/games/:gameId/kill` | 凶手击杀 |
+| POST | `/murder/games/:gameId/search` | 搜查地点 |
+| GET | `/murder/games/:gameId/stream` | SSE 事件流 |
+| POST | `/murder/games/:gameId/autorun` | 启动纯 AI 观战 |
 
-**Alicization Town 是唯一一个把社交推理嵌入像素沙盒世界的项目**——角色有空间位置、有行走路径、有表情动画 hint，不只是文本框里的名字。
+## LLM Provider Layer
 
-## 这次改了什么
+`src/llm/provider.js` 通过环境变量确定 provider：
 
-### 新增文件
+```
+MURDER_LLM_PROVIDER=openai|anthropic|deepseek (默认 openai)
+MURDER_LLM_MODEL=gpt-4o-mini (默认)
+MURDER_LLM_API_KEY=<key>
+MURDER_LLM_BASE_URL=<custom endpoint>
+```
 
-| 路径 | 说明 |
-|---|---|
-| `packages/town-plugin-murder/` | 完整插件目录 |
-| `src/engine.js` | 手动状态机引擎，10 个 GamePhase |
-| `src/game-state.js` | 状态定义、角色/阵营/阶段枚举 |
-| `src/skills.js` | 7 种角色技能执行 |
-| `src/prompts/index.js` | LLM prompt 模板 + 16 种性格行为映射 |
-| `src/scripts/midnight-manor.js` | 4 人剧本 "午夜庄园谋杀案" |
-| `src/scripts/script.schema.json` | JSON Schema (draft-07) 剧本格式规范 |
-| `src/index.js` | 9 条 HTTP 路由 + SSE 流 + 观战 autorun |
-| `src/memory/` | 向量记忆占位（embedding 接口） |
-| `src/llm/` | LLM 抽象层 |
-| `README.md` | 完整 Quickstart |
-| `docs/design-script-murder-technical.md` | 技术设计文档 |
-| `docs/proposal-script-murder-core-changes.md` | 需求提案 |
+使用 `@langchain/openai` (optionalDependency) 或 `@langchain/anthropic` (optionalDependency)。包未安装时抛出友好错误提示安装命令。
 
-### 修改的已有文件
+**LangGraph 已完全移除**——之前的实现依赖 `@langchain/langgraph`，存在 peer dep 冲突和约 2MB 包体积。改为手动 phase-based 状态机后零编排依赖。
 
-| 路径 | 改动 |
-|---|---|
-| `server/src/main.js` | 注册 murder 插件 |
-| `package-lock.json` | 新增依赖 |
+## Memory Layer
 
-## 设计决策
+`src/memory/associative-memory.js` 提供 per-character 向量记忆：
 
-| 决策 | 选择 | 理由 |
+- `add(memory)` → 生成 embedding → 存入内存数组
+- `retrieve(query, { topK })` → 余弦相似度排序取 topK
+- embedding via `@huggingface/transformers` all-MiniLM-L6-v2（可选依赖，未安装时 fallback 到随机向量——仅用于保证不报错，无实际语义能力）
+
+当前 embedding 仅用于 AI 决策时的 6 条记忆召回，不外部暴露。
+
+## Script Format
+
+`src/scripts/script.schema.json` (JSON Schema draft-07) 定义剧本模块接口：
+
+- `characters[]`: id, name, age, profession, roleId, personalityTraits, background, secret, objective
+- `locations[]`: id, name, searchableItems
+- `evidenceFragments[]`: fragmentId, evidenceId, pieceIndex, totalPieces, name, locationId, description, isForged
+- `truth`: murdererId, firstVictimId, victimName, summary
+
+编写新剧本只需创建符合 schema 的 JS module 并导出。
+
+## Files Changed
+
+### New Files (16)
+
+| Path | Lines | Description |
 |---|---|---|
-| 状态机 | 手动 phase-based | 移除 LangGraph 避免重依赖 + peer dep 冲突 |
-| 实时通信 | SSE (纯插件) | 插件无法访问 Socket.IO `io`，SSE 是零依赖方案 |
-| SSE 安全 | 视角过滤 | 防止广播泄漏角色/证据等敏感游戏信息 |
-| AI 性格 | Trait→说话风格指令映射 | 同模型上实现差异化表现，不需要多模型 |
-| 并发保护 | `_autoRunning` Set + guard | 防止 autorun 和手动操作的竞态条件 |
-| 表情 hint | `emotion` 字段 + 关键词推理 | 前端未来可渲染表情气泡（本 PR 仅输出 hint） |
-| 记忆层 | `@huggingface/transformers` 本地 embedding | 可选依赖，无 API key 也能运行 |
+| `packages/town-plugin-murder/package.json` | 26 | 插件包声明 |
+| `packages/town-plugin-murder/README.md` | 220 | 完整 Quickstart 文档 |
+| `packages/town-plugin-murder/src/game-state.js` | 157 | 状态定义、枚举、helpers |
+| `packages/town-plugin-murder/src/skills.js` | 183 | 7 角色技能执行逻辑 |
+| `packages/town-plugin-murder/src/engine.js` | 676 | 状态机引擎核心 |
+| `packages/town-plugin-murder/src/index.js` | 352 | 插件入口、HTTP路由、SSE |
+| `packages/town-plugin-murder/src/prompts/index.js` | 134 | LLM prompt 模板 + trait 映射 |
+| `packages/town-plugin-murder/src/scripts/midnight-manor.js` | 107 | 4人剧本 |
+| `packages/town-plugin-murder/src/scripts/script.schema.json` | 136 | 剧本 JSON Schema |
+| `packages/town-plugin-murder/src/llm/provider.js` | 94 | LLM provider 抽象 |
+| `packages/town-plugin-murder/src/memory/associative-memory.js` | 121 | 向量记忆 |
+| `packages/town-plugin-murder/src/memory/embedding.js` | 94 | embedding 抽象 |
+| `docs/design-script-murder-technical.md` | 936 | 技术设计文档 |
+| `docs/proposal-script-murder-core-changes.md` | 239 | 需求提案 |
+| `docs/pr-murder-core.md` | — | 本 PR 描述 |
+| `docs/pr-murder-mcp-cli.md` | — | PR2 描述 |
 
-## 局限和 Roadmap
+### Modified Files (2)
 
-这是一次**玩法探索**，验证"AI + 社交推理 + 像素世界"能不能成立。以下是已知局限：
+| Path | Change |
+|---|---|
+| `server/src/main.js` | +22/-0 注册 murder 插件到 PluginManager |
+| `package-lock.json` | +1651 新增依赖树 |
 
-- **单剧本**：目前只有 "午夜庄园" 4 人局，需要更多剧本贡献
-- **无跨局记忆**：游戏结束状态即清除，不像 infinite-echoes 那样有世界线连续性
-- **emotion 字段无前端消费**：chatLog 中的 `emotion` 是 hint，等待 game.js 接入
-- **LLM 无三层防泄漏**：prompt 是单层角色扮演，竞品 ai-murder-mystery 有 generate→critique→revise
-- **无直播集成**：不像 ai-werewolf-live 那样 OBS-ready
-
-欢迎后续有兴趣的同学一起开发，可以从以下方向切入：
-1. **新剧本创作** — 只需编写符合 `script.schema.json` 的 JS module
-2. **前端表情渲染** — 消费 SSE 中的 `emotion` 字段
-3. **多层 prompt 安全** — 防止 AI 角色泄漏角色信息
-4. **多人在线** — 多个人类玩家同时加入
-
-## 测试
+## Test Results
 
 ```bash
-npm test                                  # 全量测试
-cd packages/mcp-bridge && node --test     # MCP bridge smoke (2/2 pass)
+cd packages/mcp-bridge && node --test
+# ✔ smoke.test.js — 20 tools registered (pass)
+# ✔ compat.test.js (pass)
 ```
+
+`npm install` 成功（222 packages）。无新的 lint 错误。
+
+## Uncovered Risks
+
+| 风险 | 严重度 | 说明 |
+|---|---|---|
+| LLM 角色泄漏 | 🔴 | 当前 prompt 是单层角色扮演。AI 可能被对手引导说出秘密。竞品 ai-murder-mystery 有 generate→critique→revise 三层防护。 |
+| 单剧本 | 🟡 | 只有「午夜庄园」4人局，无法验证引擎对不同人数/角色配比的泛化能力。 |
+| 无跨局记忆 | 🟡 | 游戏结束即清除所有状态。不像 infinite-echoes 有世界线连续性。 |
+| embedding fallback | 🟡 | `@huggingface/transformers` 未安装时 fallback 随机向量，记忆检索等于随机。不报错但无效。 |
+| emotion 无前端消费 | 🟠 | chatLog 中 `emotion` 字段目前无人读取，等待 `game.js` 接入。 |
+| chatLog 无限增长 | 🟠 | 长局 chatLog 会持续膨胀，无上限截断。对 LLM 上下文窗口有影响（通过 `tail()` 取最近 N 条缓解，但 state 本身不缩减）。 |
+| SSE 无认证 | 🟠 | `/murder/games/:gameId/stream` 不需要 session，任何知道 gameId 的人可连接。视角过滤阻止了信息泄露，但可被用于 DoS。 |
+
+## Related Work
+
+后续 PR `feat/murder-mcp-cli` 将在此基础上添加 MCP Bridge 工具和 CLI 子命令。
