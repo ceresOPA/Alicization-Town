@@ -11,6 +11,7 @@ const toolModules = [
   require('./tools/communication'),
   require('./tools/interaction'),
   require('./tools/status'),
+  require('./tools/murder'),
 ];
 
 const allDefinitions = toolModules.flatMap((module) => module.definitions);
@@ -24,7 +25,16 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: allDef
 
 mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
-  const shouldReflectThinking = ['look', 'map', 'walk', 'chat', 'interact', 'status'].includes(name);
+  const shouldReflectThinking = [
+    'look',
+    'map',
+    'walk',
+    'chat',
+    'interact',
+    'status',
+    'murder_step',
+    'murder_status',
+  ].includes(name);
   if (shouldReflectThinking) {
     await client.setThinking(true).catch(() => {});
   }

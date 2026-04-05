@@ -316,7 +316,7 @@ describe('Bridge MCP (smoke)', () => {
 
     const listResponse = await sendMCPRequest(bridge, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} });
     const tools = listResponse.result.tools;
-    const expectedTools = ['login', 'list-profile', 'logout', 'characters', 'look', 'map', 'walk', 'chat', 'interact', 'status'];
+    const expectedTools = ['login', 'list-profile', 'logout', 'characters', 'look', 'map', 'walk', 'chat', 'interact', 'status', 'murder_create', 'murder_step', 'murder_status', 'murder_input', 'murder_speak', 'murder_vote', 'murder_search', 'murder_skill', 'murder_kill', 'murder_autorun'];
     assert.deepEqual(tools.map((tool) => tool.name).sort(), expectedTools.slice().sort());
 
     const loginText = await callTool(bridge, 3, 'login', { create: true, name: 'BridgeBot', sprite: 'Samurai' });
