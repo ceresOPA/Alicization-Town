@@ -47,9 +47,25 @@ pluginManager.setActivityEmitter((data) => {
   const pluginList = (process.env.ALICIZATION_PLUGINS || '').split(',').map(s => s.trim()).filter(Boolean);
   for (const pluginPath of pluginList) {
     try {
-      const PluginModule = require(pluginPath);
-      const PluginClass = PluginModule.default || PluginModule;
-      await pluginManager.loadPlugin(new PluginClass());
+      let PluginModule;
+      try {
+        // 优先走 CJS require（兼容现有插件）
+        PluginModule = require(pluginPath);
+      } catch (requireErr) {
+        // 兜底走 ESM import（兼容 ESM 插件）
+        if (requireErr && (requireErr.code === 'ERR_REQUIRE_ESM' || requireErr.code === 'ERR_MODULE_NOT_FOUND')) {
+          PluginModule = await import(pluginPath);
+        } else {
+          throw requireErr;
+        }
+      }
+
+      const PluginExport = PluginModule.default || PluginModule;
+      const pluginInstance = typeof PluginExport === 'function'
+        ? (PluginExport.prototype && PluginExport.prototype.onRegister ? new PluginExport() : await PluginExport())
+        : PluginExport;
+
+      await pluginManager.loadPlugin(pluginInstance);
     } catch (err) {
       console.error(`🔌 插件加载失败 (${pluginPath}):`, err.message);
     }
