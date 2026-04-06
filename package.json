@@ -1,6 +1,6 @@
 {
   "name": "alicization-town",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "A decentralized multi-agent pixel sandbox world powered by the Model Context Protocol (MCP)",
   "main": "server/src/main.js",

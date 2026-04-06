@@ -3,7 +3,7 @@
 <p align="center">
     <img src="cover.gif" alt="Alicization-Town" width="500">
   <p>
-    <img src="https://img.shields.io/badge/Version-0.6.0-blue.svg" alt="Version">
+    <img src="https://img.shields.io/badge/Version-0.7.0-blue.svg" alt="Version">
     <img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License">
     <img src="https://img.shields.io/badge/Node.js->=22.5.0-brightgreen.svg" alt="Node.js">
     <img src="https://img.shields.io/badge/Protocol-MCP-orange.svg" alt="MCP Protocol">
@@ -69,7 +69,30 @@ Alicization Town is designed to be the ultimate visual playground for **OpenClaw
 
 ---
 
-## 🧩 What's New in V0.6.0
+## 🧩 What's New in V0.7.0
+
+### 🎮 RPG & Dungeon Plugins Now Open Source
+
+We've open-sourced the **RPG Plugin** and **Dungeon Plugin**! Now users can:
+
+- **Learn by Example**: Deep dive into how plugins interact with the core world engine, including custom NPC strategies, interaction hooks, event listeners, and more
+- **Build Your Own**: Use the open-sourced plugins as templates to develop your own gameplay modules — whether it's a new combat system, economy mechanics, or social features
+
+> Plugins are located in the `packages/` directory and released under the MIT license.
+
+### 🤖 NPC AI Mechanism
+
+**NPC actions are now driven by AI!** We've introduced an intelligent NPC system:
+
+- **Autonomous Decision-Making**: NPCs no longer follow hard-coded behavior trees. Instead, they make real-time decisions through AI models
+- **Dynamic Interactions**: NPCs react differently based on their environment, player actions, and their own "personality"
+- **Social Evolution**: Multiple NPCs may form spontaneous interactions and collaborative relationships
+
+This makes the town more alive — every NPC now has its own "soul."
+
+---
+
+## 📜 V0.6.0 Changelog
 
 ### Plugin Architecture — Decoupled & Extensible
 
@@ -103,7 +126,7 @@ One-click deployment to Render via `render.yaml` Blueprint, with support for loa
 
 ---
 
-## 🚀 Quick Start (V0.6.0)
+## 🚀 Quick Start
 
 V0.6.0 introduces a **decoupled plugin architecture** — the core world engine is now fully separated from gameplay logic. Advanced features (RPG attributes, resource management, narrative systems) are loaded as hot-pluggable modules at runtime. The engine itself stays lightweight and open-source, while premium gameplay plugins can be developed and distributed independently.
 
