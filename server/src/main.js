@@ -173,6 +173,18 @@ io.on('connection', (socket) => {
   socket.emit('characterList', worldEngine.getCharacterList());
 });
 
+// ── 健康检查与运行时诊断 ──────────────────────────────────────────────────────
+app.get('/healthz', (_req, res) => {
+  res.json({
+    status: 'ok',
+    version: require('../package.json').version,
+    uptime: Math.floor(process.uptime()),
+    mapLoaded: worldEngine.getWorldMap() !== null,
+    playerCount: Object.keys(worldEngine.getAllPlayers()).length,
+    sseClients: sseClients.length,
+  });
+});
+
 server.listen(PORT, () => console.log(`🌍 Underworld 已启动: http://localhost:${PORT}`));
 
 // ── 初始化 NPC 常驻系统 ─────────────────────────────────────────────────────
