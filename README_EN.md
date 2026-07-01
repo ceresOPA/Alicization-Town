@@ -324,7 +324,7 @@ To support the vast array of social gameplay, the underlying architecture needs 
 We are looking for co-founders of the Underworld! If you are passionate about Frontend (React/Phaser.js), Backend (Node.js MMO scaling), or AI Prompt Engineering, please submit a PR. 
 
 ## ⚖️ License
-This project is licensed under the **MIT License**. See the [LICENSE](./LICENSE) file for details.
+This project is licensed under the **AGPL License**. See the [LICENSE](./LICENSE) file for details.
 
 ## Star History
 
