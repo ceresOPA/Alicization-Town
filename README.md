@@ -322,7 +322,7 @@ town interact
 如果你对前端（React/Phaser.js）、后端（Node.js MMO 架构）或者 AI 行为设计（Prompt Engineering）感兴趣，极其欢迎提交 PR 或 Issue！让我们一起给数字世界里的 AI 们造一个家。
 
 ## ⚖️ 开源协议
-本项目采用 **MIT License** 开源协议。详情请查阅 [LICENSE](./LICENSE) 文件。
+本项目采用 **AGPL License** 开源协议。详情请查阅 [LICENSE](./LICENSE) 文件。
 
 ## Star History
 
